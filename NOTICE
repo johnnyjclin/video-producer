@@ -1,0 +1,25 @@
+video-producer
+https://github.com/johnnyjclin/video-producer
+
+Copyright (C) 2026 Johnny Lin
+Copyright (C) 2025 calesthio and OpenMontage contributors
+
+---
+
+This project is a fork of OpenMontage (https://github.com/calesthio/OpenMontage),
+originally created by calesthio, and is licensed under the GNU Affero General
+Public License v3.0 (AGPLv3). See LICENSE for the full license text.
+
+Modifications from upstream:
+- Removed non-Claude Code agent integrations (Cursor, Copilot, Codex, Windsurf)
+- Removed NoirsBoxes commercial branding and sub-agent
+- Removed associated MCP server and plugin configuration
+- Simplified README for personal/internal use with Claude Code
+
+The following upstream components are preserved substantially unchanged:
+- Pipeline architecture and YAML manifests (pipeline_defs/)
+- Stage director skill system (skills/)
+- Tool registry and BaseTool contract (tools/)
+- Remotion and HyperFrames composition engines
+- Core infrastructure (lib/, schemas/, styles/)
+- Layer 3 provider knowledge packs (.agents/skills/)

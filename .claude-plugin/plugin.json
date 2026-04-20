@@ -1,0 +1,46 @@
+{
+  "$schema": "https://claude.ai/schemas/plugin.json",
+  "name": "noirsboxes-video-producer",
+  "version": "0.1.0",
+  "description": "Produce NoirsBoxes (Black Magic) MD-xxx showcase videos — 30s 9:16 AI fast-cut shorts via Runway + ElevenLabs + Remotion.",
+  "author": {
+    "name": "NoirsBoxes / OpenMontage"
+  },
+  "license": "MIT",
+  "keywords": ["video", "noirsboxes", "md-905", "product-video", "shorts", "runway", "elevenlabs", "remotion"],
+
+  "skills": [
+    "./.agents/skills/noirsboxes-shorts"
+  ],
+
+  "agents": [
+    "./agents/video-production-agent.md"
+  ],
+
+  "mcpServers": {
+    "noirsboxes-video-producer": {
+      "command": "python",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.py"],
+      "env": {
+        "NOIRSBOXES_PLUGIN_ROOT": "${CLAUDE_PLUGIN_ROOT}"
+      }
+    }
+  },
+
+  "requirements": {
+    "system": {
+      "node": ">=22.0.0",
+      "python": ">=3.11",
+      "ffmpeg": "any"
+    },
+    "env": {
+      "required": ["RUNWAY_API_KEY", "ELEVENLABS_API_KEY"],
+      "optional": ["FAL_KEY"]
+    }
+  },
+
+  "install": {
+    "script": "./install.sh",
+    "instructions": "Run `bash install.sh` inside the plugin directory to install Python + Node dependencies and create .env. Then `/plugin add <this-directory>` in your main agent project."
+  }
+}
