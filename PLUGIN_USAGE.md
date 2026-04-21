@@ -37,26 +37,90 @@ bash install.sh
 #      MD-XXX-blank.jpg                      # studio shot (used in outro)
 ```
 
-## Register with your main agent project
+## Register with Claude Code (local install)
 
-In a **different** folder (your main Claude Code project):
+Claude Code does **not** have a `/plugin add <path>` command. Local installs
+go through a self-hosted **marketplace** — the plugin directory declares
+itself as a marketplace, you register it once, then install the plugin from
+that marketplace. After install the plugin is available globally (user
+scope) so every Claude Code session in every project sees it.
+
+### Step 1 — validate the manifest (optional, recommended)
 
 ```bash
-cd /path/to/my-main-agent-project
+claude plugin validate /absolute/path/to/video-producer
 ```
 
-In the Claude Code session there, run:
+Expect `✔ Validation passed` for both the plugin manifest and the
+marketplace manifest.
 
+### Step 2 — register the self-marketplace
+
+```bash
+claude plugin marketplace add /absolute/path/to/video-producer
 ```
-/plugin add /absolute/path/to/video-producer
+
+This reads `.claude-plugin/marketplace.json` from the folder and registers
+the marketplace **under the name declared inside that file** (currently
+`video-producer`). Claude Code adds it to user settings; no re-run needed
+per project.
+
+Verify:
+```bash
+claude plugin marketplace list
+# → video-producer   /abs/path/to/video-producer   (local)
 ```
 
-Claude Code reads `.claude-plugin/plugin.json`, auto-registers:
-- the skill (`.agents/skills/noirsboxes-shorts`)
-- the sub-agent (`agents/video-production-agent.md`)
-- the MCP server (`mcp/server.py`)
+### Step 3 — install the plugin from the marketplace
 
-All tools show up with the `mcp__noirsboxes-video-producer__` prefix.
+```bash
+claude plugin install noirsboxes-video-producer@video-producer
+```
+
+The `@video-producer` suffix names the marketplace added in Step 2.
+Output:
+```
+Installing plugin "noirsboxes-video-producer@video-producer"...
+✔ Successfully installed plugin: noirsboxes-video-producer@video-producer (scope: user)
+```
+
+Verify:
+```bash
+claude plugin list
+# → noirsboxes-video-producer@video-producer    Version: 0.1.0    Scope: user    Status: ✔ enabled
+```
+
+### What just got registered
+
+Claude Code reads `.claude-plugin/plugin.json` and auto-loads:
+- the **skill** (`.agents/skills/noirsboxes-shorts`) — visible via `/noirsboxes-shorts`
+- the **sub-agent** (`agents/video-production-agent.md`) — invokable via the `Task` tool as `subagent_type="video-production-agent"`
+- the **MCP server** (`mcp/server.py`) — its 7 tools appear with the `mcp__noirsboxes-video-producer__` prefix
+
+### Plugin lifecycle commands
+
+| Command | What it does |
+|---|---|
+| `claude plugin list` | Show all installed plugins, versions, scope, enabled state |
+| `claude plugin disable noirsboxes-video-producer` | Temporarily disable without uninstalling (keeps settings) |
+| `claude plugin enable noirsboxes-video-producer` | Re-enable a disabled plugin |
+| `claude plugin uninstall noirsboxes-video-producer@video-producer` | Uninstall (leaves the files on disk) |
+| `claude plugin update noirsboxes-video-producer` | Pull newest version from the marketplace — run after editing files in the plugin folder |
+| `claude plugin marketplace list` | See all registered marketplaces |
+| `claude plugin marketplace update video-producer` | Refresh the local marketplace after editing `marketplace.json` |
+| `claude plugin marketplace remove video-producer` | Remove the whole marketplace (uninstalls every plugin from it) |
+
+### Session-only install (no persistence)
+
+If you want to try the plugin in a single session without registering it
+globally, launch Claude Code with `--plugin-dir`:
+
+```bash
+claude --plugin-dir /absolute/path/to/video-producer
+```
+
+The plugin is loaded for that session only and disappears when you exit.
+Useful for testing a plugin you haven't committed yet.
 
 ## Invocation patterns
 
@@ -157,20 +221,44 @@ safe/unsafe instead of 0-100):
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `/plugin add` reports "plugin.json not found" | Plugin root mis-specified | Point to the repo's **root**, not the `.claude-plugin/` folder |
-| MCP server fails to start | Python version / missing deps | Re-run `bash install.sh`; verify `python >=3.11` and `mcp` is installed |
+| `claude plugin validate` reports unrecognized keys | `plugin.json` has non-spec fields (`$schema`, `requirements`, `install`) | Remove those keys — only `name`, `version`, `description`, `author`, `license`, `keywords`, `skills`, `agents`, `mcpServers` are recognized |
+| `claude plugin marketplace add <path>` errors "manifest not found" | Folder has no `.claude-plugin/marketplace.json` | Add the marketplace file (see `.claude-plugin/marketplace.json` for the schema) |
+| `claude plugin install <name>@<marketplace>` says "plugin not found" | The `<name>` in the install command must match `plugins[].name` in marketplace.json, and `<marketplace>` must match the marketplace's top-level `name` | Check both files: `cat .claude-plugin/plugin.json .claude-plugin/marketplace.json \| grep '"name"'` |
+| `/plugin add <path>` is rejected as unknown command | No such command exists in Claude Code | Use the `marketplace add` → `plugin install` flow described above |
+| Plugin size exceeds 100 MB | Folder contains `node_modules/`, `projects/`, `.git/`, or similar bulk | Add them to `.claudeignore` (already done in this repo — see `.claudeignore`) |
+| MCP server fails to start | Python version / missing deps | Re-run `bash install.sh`; verify `python >=3.11` and `pip install mcp` |
 | `produce_noirsboxes_short` returns `blocker: Brand folder not found` | Missing SKU photos | Drop the three required photos per "What counts as a new SKU?" above |
 | Runway T2V returns 400/403 on all models | Account plan doesn't include gen4.5 | Ask Runway support to enable gen4.5 or seedance2 on the API key |
 | ElevenLabs returns 429 on multiple TTS calls | Burst rate-limit | The high-level tool already retries sequentially; if still failing, reduce `max_workers` in `server.py` |
 | Remotion render crashes with font errors | `remotion-composer/node_modules` corrupt | `cd remotion-composer && rm -rf node_modules && npm install` |
+| MCP tools don't appear in a new session | Plugin is `disabled`, MCP server crashed on boot, or cache stale | `claude plugin list` (check status) → `claude plugin update noirsboxes-video-producer` → restart the session |
 
 ## Uninstall
 
-```
-/plugin remove noirsboxes-video-producer
+```bash
+claude plugin uninstall noirsboxes-video-producer@video-producer
+# or remove the marketplace entirely (uninstalls all plugins in it):
+claude plugin marketplace remove video-producer
 ```
 
-The plugin code stays on disk — delete the folder manually if you want it gone.
+The plugin source code stays on disk — delete the folder manually if you want it gone.
+
+## Updating the plugin after local edits
+
+When you edit files inside this folder (e.g. tweak the subagent prompt, add
+a new MCP tool, update the skill), Claude Code **caches** the previous
+version. To pick up your changes:
+
+```bash
+# 1. Refresh the marketplace's view of the plugin folder
+claude plugin marketplace update video-producer
+
+# 2. Pull the new plugin version into each install
+claude plugin update noirsboxes-video-producer
+```
+
+Restart the Claude Code session (exit and re-open) so the MCP server
+re-launches with the new `mcp/server.py`.
 
 ## Cost reference
 

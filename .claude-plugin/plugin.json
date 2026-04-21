@@ -1,5 +1,4 @@
 {
-  "$schema": "https://claude.ai/schemas/plugin.json",
   "name": "noirsboxes-video-producer",
   "version": "0.1.0",
   "description": "Produce NoirsBoxes (Black Magic) MD-xxx showcase videos — 30s 9:16 AI fast-cut shorts via Runway + ElevenLabs + Remotion.",
@@ -25,22 +24,5 @@
         "NOIRSBOXES_PLUGIN_ROOT": "${CLAUDE_PLUGIN_ROOT}"
       }
     }
-  },
-
-  "requirements": {
-    "system": {
-      "node": ">=22.0.0",
-      "python": ">=3.11",
-      "ffmpeg": "any"
-    },
-    "env": {
-      "required": ["RUNWAY_API_KEY", "ELEVENLABS_API_KEY"],
-      "optional": ["FAL_KEY"]
-    }
-  },
-
-  "install": {
-    "script": "./install.sh",
-    "instructions": "Run `bash install.sh` inside the plugin directory to install Python + Node dependencies and create .env. Then `/plugin add <this-directory>` in your main agent project."
   }
 }

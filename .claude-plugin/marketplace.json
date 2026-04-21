@@ -1,0 +1,14 @@
+{
+  "name": "video-producer",
+  "owner": {
+    "name": "Johnny",
+    "email": "johnnyjclin@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "noirsboxes-video-producer",
+      "source": "./",
+      "description": "Produce NoirsBoxes MD-xxx showcase videos (30s 9:16 AI fast-cut shorts via Runway + ElevenLabs + Remotion)."
+    }
+  ]
+}
