@@ -1,27 +1,19 @@
 {
-  "name": "noirsboxes-video-producer",
+  "name": "video-producer",
   "version": "0.1.0",
-  "description": "Produce NoirsBoxes (Black Magic) MD-xxx showcase videos — 30s 9:16 AI fast-cut shorts via Runway + ElevenLabs + Remotion.",
+  "description": "AI-orchestrated product showcase video generator — 30s 9:16 / 16:9 shorts via Runway + ElevenLabs + Remotion.",
   "author": {
-    "name": "NoirsBoxes / OpenMontage"
+    "name": "Johnny Lin"
   },
-  "license": "MIT",
-  "keywords": ["video", "noirsboxes", "md-905", "product-video", "shorts", "runway", "elevenlabs", "remotion"],
-
-  "skills": [
-    "./.agents/skills/noirsboxes-shorts"
-  ],
-
-  "agents": [
-    "./agents/video-production-agent.md"
-  ],
+  "license": "AGPL-3.0",
+  "keywords": ["video", "product-video", "shorts", "runway", "elevenlabs", "remotion"],
 
   "mcpServers": {
-    "noirsboxes-video-producer": {
+    "video-producer": {
       "command": "python",
       "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.py"],
       "env": {
-        "NOIRSBOXES_PLUGIN_ROOT": "${CLAUDE_PLUGIN_ROOT}"
+        "VIDEO_PRODUCER_PLUGIN_ROOT": "${CLAUDE_PLUGIN_ROOT}"
       }
     }
   }

@@ -1,25 +1,76 @@
 # video-producer
 
-An AI-orchestrated video production system for **Claude Code**. Describe what you want in plain language — the agent handles research, scripting, asset generation, editing, and final composition.
+輸入產品型號，10 分鐘內自動產出一支 30 秒商品展示影片。**Claude Code 專用。**
 
-> Based on [OpenMontage](https://github.com/calesthio/OpenMontage) by calesthio (AGPLv3). See [NOTICE](NOTICE) for details.
+> Based on [OpenMontage](https://github.com/calesthio/OpenMontage) by calesthio（AGPLv3）。見 [NOTICE](NOTICE)。
 
-<p align="left">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPLv3-blue.svg" alt="License"></a>
-</p>
+[![License](https://img.shields.io/badge/license-AGPLv3-blue.svg)](LICENSE)
 
 ---
 
-## Quick Start
+## 驗收標準
 
-### Prerequisites
+| # | 項目 |
+|---|---|
+| **#1** | 輸入產品型號後，10 分鐘內產出完整 30 秒展示影片 |
+| **#2** | 影片含品牌 Logo、開場動畫、產品特點文字、背景音樂、結尾 CTA |
+| **#3** | 支援至少 3 種語言旁白與字幕 |
+| **#4** | 輸出格式適配 YouTube（16:9）與 TikTok / Reels（9:16）兩種比例 |
 
-- **Python 3.10+**
-- **FFmpeg** — `brew install ffmpeg` / `sudo apt install ffmpeg`
-- **Node.js 18+**
-- **Claude Code**
+---
 
-### Install
+## 設計
+
+- **Claude Code 專用**：移除 Cursor / Copilot / Codex / Windsurf 所有整合
+- **Pipeline 驅動**：YAML manifest 定義流程，Markdown skill 定義每個 stage 的執行方式；沒有 Python orchestration logic
+- **本地儲存**（2026-04-21 起）：
+  - 品牌素材 = `media/assets/brand/`
+  - 成品 = `projects/<product-id>/renders/final.mp4`
+  - 決策日誌 = `projects/<product-id>/artifacts/decision_log.json`
+- **執行入口 = Claude Code 自然語言**
+
+### 三層知識架構
+
+```
+Layer 1: tools/ + pipeline_defs/   工具能力 + 流程編排
+Layer 2: skills/                   每個 stage 的執行規範與品質標準
+Layer 3: .agents/skills/           供應商 API 深度知識包
+```
+
+### 合成引擎
+
+| 引擎 | 適合場景 |
+|------|----------|
+| **Remotion** | 資料驅動動畫、圖片轉影片、文字卡、字幕 |
+| **FFmpeg** | 剪接、音訊混音、字幕燒錄（永遠可用） |
+
+引擎在 proposal 階段鎖定，不允許靜默切換。
+
+---
+
+## 前置需求
+
+```bash
+node --version      # >= 18
+python --version    # >= 3.10
+ffmpeg -version     # 任意版本
+claude --version    # Claude Code 已安裝
+```
+
+必要 API Key（至少一組影像生成 + 一組 TTS）：
+
+```bash
+# .env（從 .env.example 複製）
+FAL_KEY=              # FLUX 圖片 + Kling / Veo 影片（推薦入門）
+ELEVENLABS_API_KEY=   # TTS 旁白 + 背景音樂生成
+RUNWAY_API_KEY=       # Runway Gen-4 影片生成（直接 API）
+```
+
+其他供應商見 `.env.example`，全部選填。
+
+---
+
+## 驗收流程
 
 ```bash
 git clone https://github.com/johnnyjclin/video-producer.git
@@ -27,137 +78,112 @@ cd video-producer
 make setup
 ```
 
-Open the project in Claude Code and tell it what you want:
+進 Claude Code 後依序執行：
 
-```
-Make a 60-second animated explainer about how neural networks learn
-```
+1. **確認環境** — 告訴 Claude `"run preflight and show me what's configured"`
+2. **填 `.env`** — 加入至少一組影像生成 Key（`FAL_KEY` 推薦）和一組 TTS Key
+3. **放品牌素材** — Logo 和產品圖放入 `media/assets/brand/`
+4. **驗收 #1 #2** — `"Make a 30-second product showcase for [型號], 9:16 vertical"`
+5. **驗收 #3** — `"Generate the same video with Japanese narration and subtitles"`
+6. **驗收 #4** — `"Also export a 16:9 version for YouTube"`
 
-> **No `make`?** Run manually: `pip install -r requirements.txt && cd remotion-composer && npm install && cd .. && pip install piper-tts && cp .env.example .env`
+---
 
-### Add API Keys (optional — more keys = more tools)
+### 加入 noirsboxes-agent 專案作為 Plugin
 
-Copy `.env.example` to `.env` and fill in what you have. Every key is optional.
+如果你的主要工作環境是 noirsboxes-agent，可以把 video-producer 掛進去，讓兩個專案的能力合併使用。
+
+**Step 1 — 先在 video-producer 安裝依賴**
 
 ```bash
-# Image + video gateway
-FAL_KEY=your-key               # FLUX images + Veo, Kling, MiniMax video
-
-# Free stock media
-PEXELS_API_KEY=your-key
-PIXABAY_API_KEY=your-key
-UNSPLASH_ACCESS_KEY=your-key
-
-# Voice & music
-ELEVENLABS_API_KEY=your-key
-SUNO_API_KEY=your-key
-
-# Other providers
-OPENAI_API_KEY=your-key
-GOOGLE_API_KEY=your-key
-RUNWAY_API_KEY=your-key
-HEYGEN_API_KEY=your-key
-XAI_API_KEY=your-key
+cd /path/to/video-producer
+bash install.sh        # 安裝 Python + Node 依賴，產生 .env
+# 填好 .env 的 API Key
 ```
+
+**Step 2 — 在 noirsboxes-agent 的 Claude Code 裡加載 plugin**
+
+```
+/plugin add /path/to/video-producer
+```
+
+加載成功後，Claude Code 會顯示 `video-producer` plugin 已啟用，MCP server 自動掛載。
+
+**Step 3 — 確認 plugin 可用**
+
+```
+"show me available plugins"
+```
+
+應該看到 `video-producer` 出現在清單，且 MCP tools（`runway_image_to_video`、`elevenlabs_tts`、`remotion_render` 等）可以被呼叫。
+
+**Step 4 — 在 noirsboxes-agent 裡產影片**
+
+```
+"Make a 30-second product showcase for MD-905, 9:16"
+```
+
+Claude 會透過 video-producer plugin 的工具完成整個生產流程，成品輸出到 `video-producer/projects/<product-id>/renders/final.mp4`。
+
+> **Plugin 路徑提示：** `/plugin add` 接受絕對路徑或相對路徑（相對於 noirsboxes-agent 專案根目錄）。建議用絕對路徑避免混淆。
 
 ---
 
-## What You Get With Zero API Keys
-
-| Capability | Free Tool |
-|-----------|-----------|
-| Narration | Piper TTS (offline) |
-| Stock footage | Archive.org, NASA, Wikimedia Commons |
-| Extra stock | Pexels, Unsplash, Pixabay (free dev keys) |
-| Composition | Remotion (React-based) + HyperFrames (HTML/GSAP) |
-| Post-production | FFmpeg |
-| Subtitles | Built-in word-level timing |
-
----
-
-## Pipelines
-
-| Pipeline | Best For |
-|----------|----------|
-| `animated-explainer` | Topic → fully generated explainer |
-| `animation` | Motion graphics, kinetic typography |
-| `avatar-spokesperson` | Avatar-driven presenter videos |
-| `cinematic` | Trailers, teasers, mood-led edits |
-| `clip-factory` | Many clips from one long source |
-| `hybrid` | Source footage + AI-generated support visuals |
-| `localization-dub` | Subtitle, dub, translated variants |
-| `podcast-repurpose` | Podcast highlights to video |
-| `screen-demo` | Screen recordings and walkthroughs |
-| `talking-head` | Footage-led speaker videos |
-
-Every pipeline follows the same structured flow:
-
-```
-research → proposal → script → scene_plan → assets → edit → compose
-```
-
----
-
-## Architecture
+## 目錄結構
 
 ```
 video-producer/
-├── tools/              # Python tools (video, audio, image, analysis, avatar, subtitle)
-├── pipeline_defs/      # YAML pipeline manifests
-├── skills/             # Markdown stage director skills
-├── schemas/            # JSON schemas for artifact validation
-├── styles/             # Visual style playbooks (YAML)
-├── remotion-composer/  # React/Remotion composition engine
-├── lib/                # Core infrastructure (checkpoints, pipeline loader, config)
-└── tests/              # Contract tests and QA harness
-```
-
-### Three-Layer Knowledge Architecture
-
-```
-Layer 1: tools/ + pipeline_defs/   "What exists" — capabilities + orchestration
-Layer 2: skills/                   "How to use it" — stage director skills, quality bars
-Layer 3: .agents/skills/           "How it works" — provider-specific knowledge packs
-```
-
----
-
-## How It Works
-
-The AI agent IS the orchestrator. No Python orchestration logic — all creative decisions, review criteria, and quality standards live in readable YAML manifests and Markdown skills.
-
-```
-Read pipeline manifest (YAML)
-  → Read stage director skill (MD)
-    → Call Python tools
-      → Self-review via reviewer skill
-        → Checkpoint state (JSON)
-          → Present to human for approval
-            → Render (Remotion / HyperFrames / FFmpeg)
-              → Post-render validation
-                → Final video output
+├── CLAUDE.md               # Claude Code 指令入口
+├── AGENT_GUIDE.md          # Agent 完整操作合約
+├── README.md
+├── NOTICE                  # 上游 OpenMontage 歸屬聲明
+│
+├── pipeline_defs/          # YAML pipeline 定義
+├── skills/                 # Markdown stage director skills
+├── tools/                  # Python 工具（影像、音訊、字幕、分析）
+├── schemas/                # JSON Schema 驗證
+├── styles/                 # 視覺風格 playbook
+├── remotion-composer/      # React/Remotion 合成引擎
+├── lib/                    # 核心基礎設施（checkpoint、pipeline loader）
+└── tests/                  # Contract tests + QA harness
+│
+├── media/
+│   └── assets/             # 🟡 gitignored；品牌素材（Logo、產品圖）
+│       └── brand/
+│
+├── projects/               # 🟢 gitignored；每次生產的輸出
+│   └── <product-id>/
+│       ├── artifacts/      # 各 stage JSON artifact
+│       ├── assets/         # 生成素材（圖、影、音）
+│       └── renders/        # final.mp4
+│
+└── music_library/          # 🟡 gitignored；版權自由音樂（可選）
 ```
 
 ---
 
-## Testing
+## 換產品 / 換品牌
+
+- **換品牌** → 替換 `media/assets/brand/` 素材 + 調整 `styles/*.yaml` 色票與字體
+- **換語言** → 同一指令加 `"with [語言] narration and subtitles"`
+- **新增輸出格式** → 修改 `lib/media_profiles.py` 的 render profile
+
+---
+
+## 測試
 
 ```bash
-# Contract tests (no API keys needed)
+# Contract tests（不需要 API Key）
 make test-contracts
 
-# All tests
+# 全部測試
 make test
 ```
 
 ---
 
-## License
+## License & 歸屬
 
-[GNU AGPLv3](LICENSE)
+Licensed under [GNU AGPLv3](LICENSE).
 
----
-
-## Acknowledgements
-
-This project is a fork of [OpenMontage](https://github.com/calesthio/OpenMontage) by calesthio, licensed under the GNU AGPLv3. The core pipeline architecture, tool registry, stage director skill system, and composition engine are based on upstream OpenMontage. This fork removes non-Claude Code agent integrations and NoirsBoxes-specific commercial content, and is maintained independently.
+This project is a fork of [OpenMontage](https://github.com/calesthio/OpenMontage) by calesthio, also licensed under AGPLv3. See [NOTICE](NOTICE) for full attribution.
