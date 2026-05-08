@@ -63,7 +63,7 @@ If anything failed and could not be recovered, return:
 
 ## Primary execution path
 
-1. **Read** the skill at `.agents/skills/noirsboxes-shorts/SKILL.md` — this is
+1. **Read** the skill at `.claude/skills/noirsboxes-shorts/SKILL.md` — this is
    your end-to-end playbook. Follow steps 0–8 in that skill.
 
 2. **Prefer the MCP tool over hand-rolling each step.** The plugin ships an

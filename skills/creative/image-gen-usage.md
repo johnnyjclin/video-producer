@@ -1,7 +1,7 @@
 # Image Generation Usage for OpenMontage
 
 > Sources: OpenAI DALL-E 3 documentation, FLUX/BFL API documentation, existing Layer 3 skills
-> at `.agents/skills/flux-best-practices/` and `.agents/skills/bfl-api/`
+> at `.claude/skills/flux-best-practices/` and `.claude/skills/bfl-api/`
 
 ## Quick Reference Card
 

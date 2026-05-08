@@ -93,7 +93,7 @@ claude plugin list
 ### What just got registered
 
 Claude Code reads `.claude-plugin/plugin.json` and auto-loads:
-- the **skill** (`.agents/skills/noirsboxes-shorts`) — visible via `/noirsboxes-shorts`
+- the **skill** (`.claude/skills/noirsboxes-shorts`) — visible via `/noirsboxes-shorts`
 - the **sub-agent** (`agents/video-production-agent.md`) — invokable via the `Task` tool as `subagent_type="video-production-agent"`
 - the **MCP server** (`mcp/server.py`) — its 7 tools appear with the `mcp__noirsboxes-video-producer__` prefix
 
