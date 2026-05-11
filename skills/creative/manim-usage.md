@@ -1,7 +1,7 @@
 # ManimCE Usage for OpenMontage
 
 > Sources: ManimCE documentation, 3Blue1Brown FAQ/conventions, Theorem of Beethoven tutorials,
-> existing Layer 3 skill at `.agents/skills/manimce-best-practices/`
+> existing Layer 3 skill at `.claude/skills/manimce-best-practices/`
 
 ## Quick Reference Card
 

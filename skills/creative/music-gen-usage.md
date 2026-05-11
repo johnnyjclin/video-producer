@@ -1,7 +1,7 @@
 # Music Generation Usage for OpenMontage
 
 > Sources: ElevenLabs Music API documentation, ElevenLabs best practices guide, Artlist BPM
-> guide, existing Layer 3 skills at `.agents/skills/music/` and `.agents/skills/elevenlabs/`
+> guide, existing Layer 3 skills at `.claude/skills/music/` and `.claude/skills/elevenlabs/`
 
 ## Quick Reference Card
 

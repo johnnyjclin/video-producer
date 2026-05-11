@@ -25,7 +25,7 @@ A `brief` artifact with these required fields:
 | `hook_angle` | A concrete promise, question, or contrarian claim. NOT "talk about X". |
 | `cta` | One verb + one object. "Follow for daily tips" / "Tap link in bio" / "Save this for later" |
 | `narrative_mode` | One of `object_led` \| `environment_led` \| `pov` \| `stylized` \| `character_led` \| `dialogue`. **See viability table below — this decides whether the brief stays local or needs cloud.** |
-| `subject_prefix` | The locked subject description carried into every shot prompt — the consistency anchor. See `.agents/skills/comfyui/SKILL.md` Option 1. |
+| `subject_prefix` | The locked subject description carried into every shot prompt — the consistency anchor. See `.claude/skills/comfyui/SKILL.md` Option 1. |
 | `tone` | 2-3 adjectives (`warm + intimate`, `kinetic + bold`, `quiet + earnest`) |
 | `target_audience` | Who scrolls past unless this is good? Be specific. |
 

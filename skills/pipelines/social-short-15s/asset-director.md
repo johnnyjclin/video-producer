@@ -5,7 +5,7 @@
 `scene_plan` approved. Generate 5 keyframes + 5 motion clips and
 optionally narration audio + background music.
 
-**Read `.agents/skills/comfyui/SKILL.md` first.** Workflow choice,
+**Read `.claude/skills/comfyui/SKILL.md` first.** Workflow choice,
 prompt formatting, and parameter ranges live there.
 
 ## Output

@@ -6,7 +6,7 @@
 spec that an asset director can hand to `comfyui_image` and
 `comfyui_video`.
 
-**Read `.agents/skills/comfyui/SKILL.md` before this stage.** Every
+**Read `.claude/skills/comfyui/SKILL.md` before this stage.** Every
 decision below references it.
 
 ## Output

@@ -600,7 +600,7 @@ class HyperFramesCompose(BaseTool):
         that land at `compositions/components/<name>.html`. After install, the
         caller is responsible for wiring the block into `index.html` via
         `data-composition-src` or pasting the component's snippet — see
-        `.agents/skills/hyperframes-registry/SKILL.md`.
+        `.claude/skills/hyperframes-registry/SKILL.md`.
         """
         workspace = self._require_workspace(inputs)
         block = (inputs.get("block_name") or "").strip()

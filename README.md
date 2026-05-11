@@ -20,7 +20,7 @@
 ```
 Layer 1: tools/ + pipeline_defs/   工具能力 + 流程編排
 Layer 2: skills/                   每個 stage 的執行規範與品質標準
-Layer 3: .agents/skills/           供應商 API 深度知識包
+Layer 3: .claude/skills/           供應商 API 深度知識包
 ```
 
 ---
