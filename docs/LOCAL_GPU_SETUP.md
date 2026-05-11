@@ -145,22 +145,75 @@ cd ..
 
 ### Step 4：下載模型權重
 
-這是最佔時間 + 硬碟的一步。video-producer 預設的 3 個 workflow 需要這些檔案：
+這是最佔時間 + 硬碟的一步。video-producer 預設的 3 個 workflow 需要這些檔案。
+
+#### 先：HuggingFace CLI + 登入
+
+```bash
+# 一次性裝好（已裝可跳過）
+pip install -U "huggingface_hub[cli]"
+```
+
+新版 `hf` CLI（`huggingface_hub ≥ 0.20`）取代了舊的 `huggingface-cli`，兩個都可用，**本指南用 `hf`**。重點變更：
+
+- 舊 flag `--local-dir-use-symlinks False` 已移除——新版預設就是直接下載實檔，**不要再加這個 flag**（會報 "No such option" 然後死掉）
+- 舊命令 `huggingface-cli download` 仍可用但不會收到新功能，建議用 `hf download`
+
+**強烈建議登入**，理由有二：
+
+1. **不登入會被 HF rate-limit** — 下載期間會跳 `Warning: You are sending unauthenticated requests`，IP 級限速容易斷
+2. **有些 repo 是 gated**（如下表標註 🔒 的），不登入直接 `403 Access denied`
+
+```bash
+# Step 1：拿一個 read token
+#   到 https://huggingface.co/settings/tokens 建一個 "read" type token
+
+# Step 2：登入 CLI
+hf auth login
+# 貼 token，按 Enter
+
+# Step 3：對 gated repo 點接受
+#   到 model 的 HF 頁面，點頁面上方的 "Agree and access repository"
+#   每個 gated repo 各做一次（看下方表標 🔒 的）
+```
 
 #### 工作流 1：`sdxl_lightning`（最低門檻、純核心 node）
 
 | 檔案 | 放哪裡 | 大小 | 來源 |
 |---|---|---|---|
-| `sd_xl_lightning_4step.safetensors` | `ComfyUI/models/checkpoints/` | ~6.5 GB | HuggingFace `ByteDance/SDXL-Lightning`（或任何 merged SDXL-Lightning checkpoint） |
+| `sd_xl_lightning_4step.safetensors` | `ComfyUI/models/checkpoints/` | ~6.5 GB | `ByteDance/SDXL-Lightning`（或任何 merged SDXL-Lightning checkpoint） |
+
+下載命令：
+
+```bash
+cd /path/to/ComfyUI
+hf download ByteDance/SDXL-Lightning sdxl_lightning_4step.safetensors --local-dir models/checkpoints
+# workflow 預設找 sd_xl_lightning_4step.safetensors（有底線）
+cd models/checkpoints && mv sdxl_lightning_4step.safetensors sd_xl_lightning_4step.safetensors && cd ../..
+```
 
 #### 工作流 2：`flux_schnell_gguf`（最佳 8GB 圖質）
 
 | 檔案 | 放哪裡 | 大小 | 來源 |
 |---|---|---|---|
-| `flux1-schnell-Q4_K_S.gguf` | `ComfyUI/models/unet/` | ~6.5 GB | HuggingFace `city96/FLUX.1-schnell-gguf` |
-| `t5xxl_fp8_e4m3fn.safetensors` | `ComfyUI/models/clip/` | ~5 GB | HuggingFace `comfyanonymous/flux_text_encoders` |
-| `clip_l.safetensors` | `ComfyUI/models/clip/` | ~250 MB | HuggingFace `comfyanonymous/flux_text_encoders` |
-| `ae.safetensors` | `ComfyUI/models/vae/` | ~340 MB | HuggingFace `black-forest-labs/FLUX.1-schnell` 的 `vae/` 子資料夾（下載後改名 `diffusion_pytorch_model.safetensors` → `ae.safetensors`） |
+| `flux1-schnell-Q4_K_S.gguf` | `ComfyUI/models/unet/` | ~6.5 GB | `city96/FLUX.1-schnell-gguf` |
+| `t5xxl_fp8_e4m3fn.safetensors` | `ComfyUI/models/clip/` | ~5 GB | `comfyanonymous/flux_text_encoders` |
+| `clip_l.safetensors` | `ComfyUI/models/clip/` | ~250 MB | `comfyanonymous/flux_text_encoders` |
+| `ae.safetensors` | `ComfyUI/models/vae/` | ~340 MB | 🔒 `black-forest-labs/FLUX.1-schnell`（gated — 要先點 Accept） |
+
+下載命令：
+
+```bash
+cd /path/to/ComfyUI
+
+hf download city96/FLUX.1-schnell-gguf flux1-schnell-Q4_K_S.gguf --local-dir models/unet
+hf download comfyanonymous/flux_text_encoders t5xxl_fp8_e4m3fn.safetensors --local-dir models/clip
+hf download comfyanonymous/flux_text_encoders clip_l.safetensors --local-dir models/clip
+
+# 注意：直接抓 root 的 ae.safetensors（不是 vae/ 子資料夾的 diffusion_pytorch_model）
+# 這需要先在 HF 網頁點 "Agree and access repository"
+hf download black-forest-labs/FLUX.1-schnell ae.safetensors --local-dir models/vae
+```
 
 ⚠️ FLUX-schnell 是 distilled，**`cfg=1.0`、`steps=4`、negative prompt 無效**。不要去調這些。
 
@@ -168,9 +221,38 @@ cd ..
 
 | 檔案 | 放哪裡 | 大小 | 來源 |
 |---|---|---|---|
-| `svd.safetensors` | `ComfyUI/models/checkpoints/` | ~9.5 GB | HuggingFace `stabilityai/stable-video-diffusion-img2vid`（**14-frame 版**） |
+| `svd.safetensors` | `ComfyUI/models/checkpoints/` | ~9.5 GB | 🔒 `stabilityai/stable-video-diffusion-img2vid`（gated — 要先點 Accept） |
+
+下載命令：
+
+```bash
+cd /path/to/ComfyUI
+
+# 同樣要先在 HF 網頁點 "Agree and access repository"
+hf download stabilityai/stable-video-diffusion-img2vid svd.safetensors --local-dir models/checkpoints
+```
 
 ⚠️ **絕對不要用 `svd_xt.safetensors`**——那是 25-frame 版，需要 ≥ 10 GB VRAM，4060 8GB 一定 OOM。
+
+#### 驗證模型都齊了
+
+```bash
+cd /path/to/ComfyUI
+
+# Option 1（如果只下了 sdxl_lightning）
+ls -lh models/checkpoints/sd_xl_lightning_4step.safetensors   # ~6.5G
+
+# Option 2（如果也下了 flux_schnell_gguf）— 共 4 個檔
+ls -lh models/unet/flux1-schnell-Q4_K_S.gguf                  # ~6.5G
+ls -lh models/clip/t5xxl_fp8_e4m3fn.safetensors               # ~4.9G
+ls -lh models/clip/clip_l.safetensors                         # ~246M
+ls -lh models/vae/ae.safetensors                              # ~340M
+
+# Option 3（如果也下了 svd_image_to_video）
+ls -lh models/checkpoints/svd.safetensors                     # ~9.5G
+```
+
+任一檔案大小明顯偏小（例如只有幾百 KB）= 下載中斷或被 HF 擋掉，重跑 `hf download` 會自動 resume。
 
 ### Step 5：驗證
 
@@ -593,7 +675,9 @@ for name in ['comfyui_image', 'comfyui_video', 'wan_video', 'ltx_video_local',
 | `nvidia-smi` not found | 驅動沒裝 | 見 [前置](#前置驅動--python) |
 | 模型下載到一半中斷 | 連線不穩 | 重跑就好，HuggingFace 會 resume |
 | 硬碟爆滿 | 模型重複下載 | ComfyUI 用 `models/` 路徑；diffusers 用 `~/.cache/huggingface/`。**可以同個 model 軟連結兩邊**避免重複 |
-| 第一次連線 HuggingFace 401/403 | 部分 model 需要授權（如 FLUX-dev） | `huggingface-cli login` 並接受 model card 條款 |
+| HuggingFace `403 Access denied / This repository requires approval` | repo 是 gated，沒登入或沒接受 license | `hf auth login` + 在 HF 網頁點 "Agree and access repository"（見 Step 4 開頭） |
+| HuggingFace `Warning: You are sending unauthenticated requests` | 沒登入，速度被 rate-limit | `hf auth login`；雖然抓得到但容易斷 |
+| `hf download` 報 `No such option: --local-dir-use-symlinks` | 新版 CLI 移除了這個 flag | 刪掉 `--local-dir-use-symlinks False`，新版預設就是下載實檔 |
 
 ---
 
