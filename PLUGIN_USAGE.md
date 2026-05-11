@@ -41,7 +41,10 @@ bash install.sh        # Python + Node + .env scaffold
 
 ### Optional — bring up ComfyUI for the local-GPU path
 
-Full instructions including the model download list live in
+**Full client-side setup** (drivers, ComfyUI, diffusers-based local
+tools like Wan / LTX-2 / HunyuanVideo / CogVideoX, VRAM decision matrix,
+troubleshooting) lives in **[docs/LOCAL_GPU_SETUP.md](docs/LOCAL_GPU_SETUP.md)**.
+ComfyUI workflow-template specifics live in
 [tools/comfyui_workflows/README.md](tools/comfyui_workflows/README.md).
 Quick version:
 

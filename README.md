@@ -38,7 +38,7 @@ pip install -r requirements.txt
 python main.py --listen 127.0.0.1 --port 8188
 ```
 
-下載對應模型權重（FLUX-schnell GGUF / SDXL Lightning / Stable Video Diffusion）— 完整清單見 [tools/comfyui_workflows/README.md](tools/comfyui_workflows/README.md)。
+下載對應模型權重（FLUX-schnell GGUF / SDXL Lightning / Stable Video Diffusion）— 完整客戶端設定步驟見 **[docs/LOCAL_GPU_SETUP.md](docs/LOCAL_GPU_SETUP.md)**（含驅動、ComfyUI bring-up、diffusers 工具、VRAM 決策矩陣、troubleshooting）。
 
 之後 agent 透過 `comfyui_image` / `comfyui_video` 工具直接打 `127.0.0.1:8188`，免 API key、免上傳、免計費。
 
