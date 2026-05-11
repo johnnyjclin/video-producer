@@ -1,4 +1,4 @@
-# OpenMontage
+# video-producer
 
 **MANDATORY: Read `AGENT_GUIDE.md` before responding to ANY user message.**
 
@@ -7,3 +7,5 @@ It contains routing rules that determine your first action based on what the use
 Skipping it WILL cause you to take the wrong action.
 
 There are no instructions in this file. All instructions are in AGENT_GUIDE.md.
+
+> Forked from OpenMontage (AGPLv3). See `NOTICE` for attribution.

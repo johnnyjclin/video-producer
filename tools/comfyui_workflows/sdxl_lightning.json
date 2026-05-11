@@ -1,0 +1,85 @@
+{
+  "_meta": {
+    "name": "sdxl_lightning",
+    "kind": "image",
+    "description": "SDXL Lightning 4-step text-to-image. Vanilla ComfyUI, no custom nodes. Tuned for RTX 4060 8GB.",
+    "slots": {
+      "prompt": ["6.text"],
+      "negative_prompt": ["7.text"],
+      "seed": ["3.seed"],
+      "steps": ["3.steps"],
+      "cfg": ["3.cfg"],
+      "width": ["5.width"],
+      "height": ["5.height"],
+      "model_name": ["4.ckpt_name"],
+      "filename_prefix": ["9.filename_prefix"]
+    },
+    "output_node": "9",
+    "required_custom_nodes": [],
+    "required_models": [
+      {
+        "type": "checkpoint",
+        "default": "sd_xl_lightning_4step.safetensors",
+        "place_in": "ComfyUI/models/checkpoints/",
+        "source_hint": "huggingface ByteDance/SDXL-Lightning or any merged SDXL-Lightning checkpoint"
+      }
+    ]
+  },
+  "3": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 4,
+      "cfg": 1.5,
+      "sampler_name": "dpmpp_sde",
+      "scheduler": "karras",
+      "denoise": 1.0,
+      "model": ["4", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "latent_image": ["5", 0]
+    }
+  },
+  "4": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "sd_xl_lightning_4step.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "a high-quality photograph",
+      "clip": ["4", 1]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "lowres, blurry, watermark, text, logo, bad anatomy",
+      "clip": ["4", 1]
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["3", 0],
+      "vae": ["4", 2]
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "openmontage_sdxl",
+      "images": ["8", 0]
+    }
+  }
+}

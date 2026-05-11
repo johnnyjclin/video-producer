@@ -12,27 +12,41 @@ Skip this skill when the user arrives with a specific, actionable request like "
 
 ### Step 1: Run Preflight Discovery
 
-Before saying anything creative, know what you're working with:
+Before saying anything creative, know what you're working with. **Use
+`provider_menu_summary()` — it's the human-ready rollup. Do NOT dump
+the raw `support_envelope()` or full `provider_menu()` — those are
+firehoses (megabytes of JSON on a well-configured machine) and will
+bury the user.**
 
 ```bash
 python -c "
 from tools.tool_registry import registry
 import json
 registry.discover()
-envelope = registry.support_envelope()
-menu = registry.provider_menu()
-print('=== ENVELOPE ===')
-print(json.dumps(envelope, indent=2))
-print('=== MENU ===')
-print(json.dumps(menu, indent=2))
+print(json.dumps(registry.provider_menu_summary(), indent=2))
 "
 ```
 
-Parse the output into three buckets:
+The summary returns four fields:
 
-1. **Available** — tools with `status: AVAILABLE`
-2. **Quick unlocks** — tools with `status: UNAVAILABLE` whose `install_instructions` reference an env var (1-minute fixes)
-3. **Hardware unlocks** — tools requiring GPU or local model downloads
+1. **`composition_runtimes`** — booleans for `ffmpeg`, `remotion`, `hyperframes`
+2. **`capabilities[]`** — one entry per capability family with
+   `configured / total` counts and provider lists (this maps directly
+   to the bucket layout below)
+3. **`setup_offers[]`** — unavailable tools whose install is a
+   1-minute env-var fix
+4. **`runtime_warnings[]`** — silent-failure signals like
+   "hyperframes: npm package not resolvable" — surface these verbatim
+
+Parse the summary into three buckets:
+
+1. **Available** — providers within each capability's `configured` count
+2. **Quick unlocks** — entries from `setup_offers[]` (1-minute env-var fixes)
+3. **Hardware unlocks** — providers with `runtime: LOCAL_GPU` (need GPU + model downloads)
+
+**Only** reach for the full `provider_menu()` if the summary genuinely
+isn't enough for the user's question. Never dump `support_envelope()`
+to chat — that's debug-only output for `tools/tool_registry.py`.
 
 ### Step 2: Determine the User's Setup Tier
 

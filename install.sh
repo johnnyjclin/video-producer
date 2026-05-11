@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ----------------------------------------------------------------------
-#  NoirsBoxes Video Producer — one-shot dependency installer
+#  Social Short Producer — one-shot dependency installer
+#
+#  A Claude Code plugin for producing 15-second social shorts on a local
+#  RTX 4060 8GB (or comparable) GPU via ComfyUI. No mandatory cloud APIs.
 #
 #  Usage: bash install.sh
-#
-#  After this runs cleanly, go to your main agent project and run:
-#    /plugin add <absolute-path-to-this-folder>
 # ----------------------------------------------------------------------
 
 set -euo pipefail
@@ -15,7 +15,7 @@ PLUGIN_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$PLUGIN_ROOT"
 
 echo "=============================================================="
-echo "  NoirsBoxes Video Producer — installing in:"
+echo "  Social Short Producer — installing in:"
 echo "  $PLUGIN_ROOT"
 echo "=============================================================="
 
@@ -41,7 +41,7 @@ elif command -v uv >/dev/null 2>&1 && [ -f "pyproject.toml" ]; then
     uv sync
 else
     echo "⚠️  No requirements.txt or uv project found — installing minimum MCP + core deps"
-    python -m pip install -q "mcp>=0.9.0" "fal-client" "requests" "python-dotenv" "fastmcp"
+    python -m pip install -q "mcp>=0.9.0" "requests" "python-dotenv" "fastmcp"
 fi
 
 # Also install MCP server's own deps (kept separate so it's minimal)
@@ -63,25 +63,29 @@ cd "$PLUGIN_ROOT"
 # --- 3. .env scaffold ---
 echo ""
 if [ ! -f .env ]; then
-    cp .env.example .env
-    echo "📝 Created .env from .env.example."
+    [ -f .env.example ] && cp .env.example .env || touch .env
+    echo "📝 Created .env."
     echo ""
-    echo "⚠️  EDIT .env AND FILL IN:"
-    echo "      RUNWAY_API_KEY       (required — https://dev.runwayml.com/)"
-    echo "      ELEVENLABS_API_KEY   (required — https://elevenlabs.io/)"
-    echo "      FAL_KEY              (optional — fallback if Runway plan limits)"
+    echo "ℹ️  This plugin runs locally by default — no API keys are required."
+    echo "    Optional cloud fallbacks (only used when a registry tool calls them):"
+    echo "      COMFYUI_HOST / COMFYUI_PORT  (defaults: 127.0.0.1 / 8188)"
+    echo "      RUNWAY_API_KEY               (optional — premium hero clips)"
+    echo "      ELEVENLABS_API_KEY           (optional — better TTS)"
+    echo "      FAL_KEY                      (optional — fal.ai fallbacks)"
     echo ""
 else
     echo "✔️  .env already exists — skipping scaffold."
 fi
 
-# --- 4. sanity check the brand asset folder ---
-BRAND_DIR="$PLUGIN_ROOT/assets/brand/norisboxes/product-image"
-if [ -d "$BRAND_DIR" ]; then
-    sku_count=$(find "$BRAND_DIR" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
-    echo "✔️  Found $sku_count SKU folder(s) under assets/brand/norisboxes/product-image/"
+# --- 4. ComfyUI reachability check (best-effort, non-blocking) ---
+echo ""
+HOST="${COMFYUI_HOST:-127.0.0.1}"
+PORT="${COMFYUI_PORT:-8188}"
+if curl -fsS --max-time 2 "http://$HOST:$PORT/system_stats" >/dev/null 2>&1; then
+    echo "✔️  ComfyUI reachable at $HOST:$PORT"
 else
-    echo "⚠️  assets/brand/norisboxes/ not found — you'll need to drop MD-xxx photos here before producing a new SKU."
+    echo "ℹ️  ComfyUI not running at $HOST:$PORT — that's OK, you can start it later."
+    echo "    See tools/comfyui_workflows/README.md for setup + model download list."
 fi
 
 # --- 5. final instructions ---
@@ -92,24 +96,21 @@ echo "=============================================================="
 echo ""
 echo "Next steps (runs once, then the plugin is available in every Claude Code session):"
 echo ""
-echo "  1. Edit .env with your real API keys (if not already done)."
+echo "  1. Start ComfyUI on your GPU machine (see tools/comfyui_workflows/README.md)."
 echo ""
 echo "  2. Register this folder as a local marketplace:"
 echo "       claude plugin marketplace add $PLUGIN_ROOT"
 echo ""
 echo "  3. Install the plugin from the marketplace:"
-echo "       claude plugin install noirsboxes-video-producer@video-producer"
+echo "       claude plugin install video-producer@video-producer"
 echo ""
 echo "  4. Verify:"
 echo "       claude plugin list"
 echo ""
-echo "  5. From any project (in a fresh Claude Code session):"
-echo "       \"Use the video-production-agent to produce a 30s short for MD-905.\""
-echo ""
-echo "     …or call the MCP tool directly:"
-echo "       mcp__noirsboxes-video-producer__produce_noirsboxes_short(sku='MD-905')"
+echo "  5. From your host editor agent: ask for a 15s social short and the"
+echo "     social-short-15s pipeline will run end-to-end on local GPU."
 echo ""
 echo "  After editing plugin files later, pull changes with:"
 echo "       claude plugin marketplace update video-producer"
-echo "       claude plugin update noirsboxes-video-producer"
+echo "       claude plugin update video-producer"
 echo ""

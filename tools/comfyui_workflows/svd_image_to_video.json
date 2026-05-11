@@ -1,0 +1,108 @@
+{
+  "_meta": {
+    "name": "svd_image_to_video",
+    "kind": "video",
+    "description": "Stable Video Diffusion image-to-video. 14 frames at 768x432 fits 8GB VRAM. Requires VideoHelperSuite for MP4 output.",
+    "slots": {
+      "image_filename": ["3.image"],
+      "seed": ["7.seed"],
+      "steps": ["7.steps"],
+      "cfg": ["7.cfg"],
+      "video_frames": ["5.video_frames"],
+      "motion_bucket_id": ["5.motion_bucket_id"],
+      "fps": ["5.fps", "9.frame_rate"],
+      "augmentation_level": ["5.augmentation_level"],
+      "width": ["5.width"],
+      "height": ["5.height"],
+      "model_name": ["4.ckpt_name"],
+      "filename_prefix": ["9.filename_prefix"]
+    },
+    "output_node": "9",
+    "required_custom_nodes": [
+      {
+        "name": "ComfyUI-VideoHelperSuite",
+        "node_class": "VHS_VideoCombine",
+        "install_hint": "git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite into ComfyUI/custom_nodes/"
+      }
+    ],
+    "required_models": [
+      {
+        "type": "checkpoint",
+        "default": "svd.safetensors",
+        "place_in": "ComfyUI/models/checkpoints/",
+        "source_hint": "huggingface stabilityai/stable-video-diffusion-img2vid (14-frame model is 8GB-friendly; svd_xt.safetensors needs ≥10GB)"
+      }
+    ]
+  },
+  "3": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "input.png",
+      "upload": "image"
+    }
+  },
+  "4": {
+    "class_type": "ImageOnlyCheckpointLoader",
+    "inputs": {
+      "ckpt_name": "svd.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "SVD_img2vid_Conditioning",
+    "inputs": {
+      "video_frames": 14,
+      "motion_bucket_id": 127,
+      "fps": 7,
+      "augmentation_level": 0.0,
+      "clip_vision": ["4", 1],
+      "init_image": ["3", 0],
+      "vae": ["4", 2],
+      "width": 768,
+      "height": 432
+    }
+  },
+  "6": {
+    "class_type": "VideoLinearCFGGuidance",
+    "inputs": {
+      "min_cfg": 1.0,
+      "model": ["4", 0]
+    }
+  },
+  "7": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 20,
+      "cfg": 2.5,
+      "sampler_name": "euler",
+      "scheduler": "karras",
+      "denoise": 1.0,
+      "model": ["6", 0],
+      "positive": ["5", 0],
+      "negative": ["5", 1],
+      "latent_image": ["5", 2]
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["7", 0],
+      "vae": ["4", 2]
+    }
+  },
+  "9": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "frame_rate": 7,
+      "loop_count": 0,
+      "filename_prefix": "openmontage_svd",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "pingpong": false,
+      "save_output": true,
+      "images": ["8", 0]
+    }
+  }
+}

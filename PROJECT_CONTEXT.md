@@ -1,10 +1,10 @@
-# OpenMontage - Shared Project Context
+# video-producer - Shared Project Context
 
 This is the single source of truth for project architecture and conventions. All platform-specific agent files (CLAUDE.md, CODEX.md, CURSOR.md, COPILOT.md) should point here instead of duplicating this content.
 
 ## Identity
 
-OpenMontage is an open-source, AI-orchestrated video production platform.
+video-producer is an open-source, AI-orchestrated video production platform (forked from OpenMontage — see `NOTICE` for attribution).
 
 ## Architecture: Instruction-Driven (Agent-First)
 
@@ -34,7 +34,7 @@ Agent reads pipeline manifest (YAML) → reads stage director skill (MD)
 
 ```
 Layer 1: tools/tool_registry.py     → "What tools exist" (runtime capabilities, status, cost)
-Layer 2: skills/                    → "How OpenMontage uses them" (project conventions)
+Layer 2: skills/                    → "How video-producer uses them" (project conventions)
 Layer 3: .agents/skills/            → "How the technology works" (generic API rules, skills.sh)
 ```
 
@@ -75,7 +75,7 @@ Each tool's `agent_skills[]` field bridges Layer 1 → Layer 3. See `skills/INDE
 | `lib/hyperframes_style_bridge.py` | Playbook → CSS custom properties + `DESIGN.md` bridge for HyperFrames workspaces |
 | `remotion-composer/src/components/` | 8 Remotion components (TextCard, StatCard, ProgressBar, CalloutBox, ComparisonCard + charts/) |
 | `.agents/skills/hyperframes*/` | Vendored HyperFrames Layer 3 skills (authoring contract, CLI, registry, website-to-video) |
-| `skills/core/hyperframes.md` | Layer 2 — when OpenMontage should pick HyperFrames vs Remotion, artifact → workspace mapping |
+| `skills/core/hyperframes.md` | Layer 2 — when video-producer should pick HyperFrames vs Remotion, artifact → workspace mapping |
 | `schemas/styles/playbook.schema.json` | Playbook schema v2 with design tokens (chart_palette, scale_system, weight_matrix, color_rules) |
 | `tests/qa/` | Quality validation test scripts for tool-by-tool output inspection |
 
@@ -93,6 +93,8 @@ Each tool's `agent_skills[]` field bridges Layer 1 → Layer 3. See `skills/INDE
 | `hybrid` | `pipeline_defs/hybrid.yaml` | Source-plus-support hybrid |
 | `avatar-spokesperson` | `pipeline_defs/avatar-spokesperson.yaml` | Avatar presenter |
 | `localization-dub` | `pipeline_defs/localization-dub.yaml` | Localization and dubbing |
+| `documentary-montage` | `pipeline_defs/documentary-montage.yaml` | Footage-led documentary montage |
+| `social-short-15s` | `pipeline_defs/social-short-15s.yaml` | 15s vertical social short, local-GPU first |
 | `framework-smoke` | `pipeline_defs/framework-smoke.yaml` | Test harness |
 
 ## When Building New Pipelines

@@ -1,12 +1,12 @@
 {
   "name": "video-producer",
-  "version": "0.1.0",
-  "description": "AI-orchestrated product showcase video generator — 30s 9:16 / 16:9 shorts via Runway + ElevenLabs + Remotion.",
+  "version": "0.2.0",
+  "description": "AI video producer plugin for social media bot to create engaging images or short videos for social media platforms like Instagram, TikTok, YouTube Shorts, etc. It uses AI to generate content based on user prompts or scripts and can create videos with dynamic transitions, effects, and music.",
   "author": {
     "name": "Johnny Lin"
   },
   "license": "AGPL-3.0",
-  "keywords": ["video", "product-video", "shorts", "runway", "elevenlabs", "remotion"],
+  "keywords": ["video", "social-short", "shorts", "comfyui", "local-gpu", "flux", "svd", "remotion", "ffmpeg", "python", "ai", "generative"],
 
   "mcpServers": {
     "video-producer": {

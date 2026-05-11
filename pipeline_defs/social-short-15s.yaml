@@ -1,0 +1,215 @@
+name: social-short-15s
+version: "1.0"
+description: >
+  15-second social short with a fixed Hook (3s) + 3×3s Middle + CTA (3s) structure.
+  Designed for a "小編 / social-editor" agent producing IG Reels / TikTok / YouTube
+  Shorts on demand, using the local ComfyUI bridge as the default asset path. No
+  cloud APIs required — fits an RTX 4060 8GB.
+
+  DESIGN NOTE — why this pipeline is "lean" (5 stages vs the 8-10 of explainer /
+  cinematic / animation): social shorts are a high-frequency, low-budget format.
+  A small editor producing 5 shorts a day cannot afford a research stage + a
+  proposal stage + a publish stage per video. This pipeline collapses to the
+  minimum that still produces something defensible:
+
+    idea       — brief + narrative_mode classification + viability gating
+    script     — 5-section script (or 4-6 with variable shot duration)
+    scene_plan — per-shot visual + motion direction (uses narrative pattern templates)
+    assets     — keyframes + motion clips (auto-proceed once scene_plan approved)
+    compose    — Remotion render with text overlays (auto-proceed)
+
+  Research happens (lightly) inside the idea stage if needed. There is no
+  separate proposal stage because the brief itself IS the proposal. There is no
+  publish stage because the host editor agent handles posting. If a customer
+  needs deeper research or formal proposals, route them to animated-explainer
+  instead.
+
+category: generated
+stability: beta
+
+default_checkpoint_policy: guided
+
+reference_input:
+  supported: true
+  analysis_depth: transcript_only
+  analysis_tools:
+    - video_analyzer
+    - transcript_fetcher
+
+extensions:
+  custom_scripts: false
+  custom_playbooks: true
+  custom_skills: true
+  custom_tools: false
+
+required_skills:
+  - pipelines/social-short-15s/idea-director
+  - pipelines/social-short-15s/script-director
+  - pipelines/social-short-15s/scene-director
+  - pipelines/social-short-15s/asset-director
+  - pipelines/social-short-15s/compose-director
+  - meta/reviewer
+  - meta/checkpoint-protocol
+
+compatible_playbooks:
+  recommended:
+    - flat-motion-graphics
+  also_works:
+    - clean-professional
+  custom_allowed: true
+
+stages:
+  # ── Brief ────────────────────────────────────────────────────────
+
+  - name: idea
+    skill: pipelines/social-short-15s/idea-director
+    produces:
+      - brief
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Platform target is explicit (IG Reels / TikTok / Shorts) — drives aspect ratio
+      - If both Remotion and HyperFrames are available, both options are presented and a render runtime is approved before compose
+      - "narrative_mode is one of object_led / environment_led / pov / stylized / character_led — dialogue must be redirected to a different pipeline"
+      - "If narrative_mode is character_led, user has been shown the consistency risk and explicitly accepted it"
+      - Hook angle is concrete (a question, a stat, a contrarian claim — not "talk about X")
+      - CTA is one verb the viewer can do in <5 seconds (follow, save, click bio)
+      - Subject prefix matches the format demanded by narrative_mode (see idea-director "Subject prefix rules per mode")
+      - Tone words match the visual style playbook
+    success_criteria:
+      - Schema-valid brief with platform, duration=15, hook, cta, narrative_mode, subject_prefix
+      - Aspect ratio set (9:16 default; 1:1 only if explicitly requested)
+      - narrative_mode != "dialogue" (rejected at this stage)
+
+  # ── Script (5 lines, fixed 3s/shot) ──────────────────────────────
+
+  - name: script
+    skill: pipelines/social-short-15s/script-director
+    required_artifacts_in:
+      - brief
+    produces:
+      - script
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Section count between 4 and 6 (default 5) — chosen to fit the narrative pattern
+      - Section ids include exactly one hook and one cta; middle ids are mid_1, mid_2, ...
+      - Each section's narration fits its target_seconds (8-12 words English / 15-22 syllables Mandarin per 3s)
+      - Hook lands in the first 1.5 seconds
+      - Each middle section advances ONE idea — no compound claims
+      - CTA names a single action
+    success_criteria:
+      - Schema-valid script with 4-6 sections totaling 15s ±0.5s
+      - narrative_mode and subject_prefix carried forward unchanged from brief
+
+  # ── Scene plan (5 shots, per-shot visual + motion direction) ─────
+
+  - name: scene_plan
+    skill: pipelines/social-short-15s/scene-director
+    required_artifacts_in:
+      - script
+      - brief
+    produces:
+      - scene_plan
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - 4-6 shots, each linked to a script section
+      - Shot structure follows the narrative_mode's pattern template (object_led / environment_led / pov / stylized / character_led)
+      - "Each shot's target_seconds + intro_pad + outro_pad math correctly to total 15s ±0.3s"
+      - "motion_seconds is exactly 2.0 (or 0 for static-only shots) — do not allow 3s+ motion claims"
+      - Each shot specifies image_workflow (flux_schnell_gguf / sdxl_lightning) — see comfyui skill
+      - video_motion chosen per shot intent (subtle / balanced / dramatic)
+      - "For character_led without IPAdapter: at most ONE shot with a face close-up; remainder use over-shoulder, hands, silhouette"
+      - "For stylized: AnimateDiff template gap acknowledged in scene_plan.notes"
+      - Visual variety — no 3 consecutive shots with the same composition
+    success_criteria:
+      - Schema-valid scene_plan with 4-6 shots
+      - Every shot has subject_prefix prepended for consistency
+      - Every shot declares image_workflow and either video_workflow + video_motion OR video_workflow=null
+      - Sum of target_seconds across shots equals 15.0 ±0.3
+
+  # ── Assets (5 keyframes + 5 SVD clips) ───────────────────────────
+
+  - name: assets
+    skill: pipelines/social-short-15s/asset-director
+    required_artifacts_in:
+      - scene_plan
+      - script
+    produces:
+      - asset_manifest
+    required_tools:
+      - comfyui_image
+      - comfyui_video
+    fallback_tools:
+      - image_selector
+      - video_selector
+      - local_diffusion
+      - wan_video
+    optional_tools:
+      - tts_selector
+      - music_gen
+    tools_available:
+      - comfyui_image
+      - comfyui_video
+      - image_selector
+      - video_selector
+      - tts_selector
+      - music_gen
+      - local_diffusion
+      - wan_video
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - All keyframes generated and visually coherent (subject prefix held)
+      - "Each motion shot generated with video_frames=14 and fps=7 — no overrides"
+      - "Each motion clip's duration via ffprobe is 1.95-2.05s (= 14 frames @ 7fps)"
+      - SVD output not warping (faces / hands / two-character morph)
+      - Each shot's keyframe stored at full resolution + svd_input_path stored at SVD resolution
+      - Narration audio segments produced if TTS configured (auto-skip if not)
+      - Background music selected from music_library/ or generated, OR explicitly omitted
+      - asset_manifest paths point under projects/<project>/assets/
+    success_criteria:
+      - One keyframe path per shot in asset_manifest.images
+      - One motion clip path per non-static shot in asset_manifest.video, plus motion_seconds + intro/outro pads recorded
+      - Total wall-time under 10 minutes on 4060 8GB
+
+  # ── Compose (no separate edit stage — text + concat in one pass) ─
+
+  - name: compose
+    skill: pipelines/social-short-15s/compose-director
+    required_artifacts_in:
+      - asset_manifest
+      - script
+      - scene_plan
+      - brief
+    produces:
+      - render_report
+    required_tools:
+      - video_compose
+    fallback_tools:
+      - video_stitch
+    optional_tools:
+      - audio_mixer
+      - subtitle_gen
+    tools_available:
+      - video_compose
+      - video_stitch
+      - audio_mixer
+      - subtitle_gen
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Final duration is 15s ±0.3s
+      - "Each shot rendered as motion sandwich: static_pad_intro + 2s motion + static_pad_outro = target_seconds (no hold_last_frame hack)"
+      - Hook text overlay readable in first 1.5s
+      - CTA overlay visible for full duration of last shot
+      - Aspect ratio matches brief.platform target
+      - render_runtime approval exists before compose (Remotion required if any text overlay present; FFmpeg only acceptable for overlay-free shorts)
+    success_criteria:
+      - Schema-valid render_report with output mp4 path
+      - Output passes ffprobe duration + resolution checks
+      - render_runtime_selection decision logged in decision_log

@@ -291,9 +291,16 @@ class VideoSelector(BaseTool):
         for tool in candidates:
             supports = getattr(tool, "supports", {})
             props = getattr(tool, "input_schema", {}).get("properties", {})
+            caps = set(getattr(tool, "capabilities", []) or [])
 
             if operation == "image_to_video":
-                if supports.get("image_to_video") or "image_url" in props or "reference_image_url" in props:
+                if (
+                    supports.get("image_to_video")
+                    or "image_to_video" in caps
+                    or "image_url" in props
+                    or "reference_image_url" in props
+                    or "reference_image_path" in props
+                ):
                     filtered.append(tool)
                 continue
 

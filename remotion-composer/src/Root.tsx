@@ -14,7 +14,6 @@ import { EndTag, EndTagProps } from "./components/EndTag";
 import { HeroTitle } from "./components/HeroTitle";
 import { ProductReveal, ProductRevealProps } from "./components/ProductReveal";
 import { CaptionOverlay, WordCaption } from "./components/CaptionOverlay";
-import { MD905Shorts, md905ShortsDuration } from "./MD905Shorts";
 
 // ---------------------------------------------------------------------------
 // Theme System — prevents every video from looking like dark fintech
@@ -134,35 +133,6 @@ const calculateMetadata: CalculateMetadataFunction<ExplainerProps> = async ({
 export const Root: React.FC = () => {
   return (
     <>
-      <Composition
-        id="MD905Shorts"
-        component={MD905Shorts}
-        durationInFrames={md905ShortsDuration}
-        fps={30}
-        width={1080}
-        height={1920}
-        defaultProps={{
-          tvCableBad:      "md905-shorts/tv_cable_bad.mp4",
-          tvPhoneDying:    "md905-shorts/tv_phone_dying.mp4",
-          tvCableSwap:     "md905-shorts/tv_cable_swap.mp4",
-          tvPhoneHealthy:  "md905-shorts/tv_phone_healthy.mp4",
-          ivDeviceReveal:  "md905-shorts/iv_device_reveal.mp4",
-          ivInferiorPush:  "md905-shorts/iv_inferior_push.mp4",
-          ivOriginalPush:  "md905-shorts/iv_original_push.mp4",
-          studioImg: "md905-shorts/md905-studio.jpg",
-          logo:      "md905-shorts/logo.png",
-          music:     "md905-shorts/bed.mp3",
-          vo1: "md905-shorts/vo_01_hook.mp3",
-          vo2: "md905-shorts/vo_02_problem.mp3",
-          vo3: "md905-shorts/vo_03_solution.mp3",
-          vo4: "md905-shorts/vo_04_inferior.mp3",
-          vo5: "md905-shorts/vo_05_swap.mp3",
-          vo6: "md905-shorts/vo_06_original.mp3",
-          vo7: "md905-shorts/vo_07_safe.mp3",
-          vo8: "md905-shorts/vo_08_features.mp3",
-          vo9: "md905-shorts/vo_09_cta.mp3",
-        }}
-      />
       <Composition
         id="Explainer"
         component={Explainer}

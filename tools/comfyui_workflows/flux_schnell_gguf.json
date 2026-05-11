@@ -1,0 +1,122 @@
+{
+  "_meta": {
+    "name": "flux_schnell_gguf",
+    "kind": "image",
+    "description": "FLUX.1-schnell via GGUF Q4_K_S quantization. 4-step distilled model (cfg=1.0 — negative prompt has no effect). Tuned for RTX 4060 8GB.",
+    "slots": {
+      "prompt": ["6.text"],
+      "negative_prompt": ["7.text"],
+      "seed": ["3.seed"],
+      "steps": ["3.steps"],
+      "width": ["5.width"],
+      "height": ["5.height"],
+      "model_name": ["12.unet_name"],
+      "filename_prefix": ["9.filename_prefix"]
+    },
+    "output_node": "9",
+    "required_custom_nodes": [
+      {
+        "name": "ComfyUI-GGUF",
+        "node_class": "UnetLoaderGGUF",
+        "install_hint": "git clone https://github.com/city96/ComfyUI-GGUF into ComfyUI/custom_nodes/ (or via ComfyUI-Manager)"
+      }
+    ],
+    "required_models": [
+      {
+        "type": "unet_gguf",
+        "default": "flux1-schnell-Q4_K_S.gguf",
+        "place_in": "ComfyUI/models/unet/",
+        "source_hint": "huggingface city96/FLUX.1-schnell-gguf — Q4_K_S is ~6.5GB (8GB-friendly); Q5_K_S ~7.5GB is borderline"
+      },
+      {
+        "type": "clip",
+        "default": "t5xxl_fp8_e4m3fn.safetensors",
+        "place_in": "ComfyUI/models/clip/",
+        "source_hint": "huggingface comfyanonymous/flux_text_encoders"
+      },
+      {
+        "type": "clip",
+        "default": "clip_l.safetensors",
+        "place_in": "ComfyUI/models/clip/",
+        "source_hint": "huggingface comfyanonymous/flux_text_encoders"
+      },
+      {
+        "type": "vae",
+        "default": "ae.safetensors",
+        "place_in": "ComfyUI/models/vae/",
+        "source_hint": "huggingface black-forest-labs/FLUX.1-schnell (vae/ subfolder; rename diffusion_pytorch_model.safetensors → ae.safetensors)"
+      }
+    ]
+  },
+  "3": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": ["12", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "latent_image": ["5", 0]
+    }
+  },
+  "5": {
+    "class_type": "EmptySD3LatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "a high-quality photograph",
+      "clip": ["11", 0]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "",
+      "clip": ["11", 0]
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["3", 0],
+      "vae": ["10", 0]
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "openmontage_flux",
+      "images": ["8", 0]
+    }
+  },
+  "10": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    }
+  },
+  "11": {
+    "class_type": "DualCLIPLoader",
+    "inputs": {
+      "clip_name1": "t5xxl_fp8_e4m3fn.safetensors",
+      "clip_name2": "clip_l.safetensors",
+      "type": "flux"
+    }
+  },
+  "12": {
+    "class_type": "UnetLoaderGGUF",
+    "inputs": {
+      "unet_name": "flux1-schnell-Q4_K_S.gguf"
+    }
+  }
+}

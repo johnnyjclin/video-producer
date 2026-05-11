@@ -1,58 +1,105 @@
-# Using `noirsboxes-video-producer` as a Claude Code plugin
+# Using `video-producer` as a Claude Code plugin
 
-This project ships as a reusable Claude Code plugin so your **main agent
-project** can delegate NoirsBoxes (Black Magic) MD-xxx showcase video
-production to it without ever touching the underlying Python / Node / Runway
-plumbing.
+This plugin gives a host agent access to a general-purpose video
+production toolkit — 13 pipelines, 80+ tools, both local-GPU and
+cloud-API paths. The host agent reads the customer's request, picks a
+pipeline, and drives the production through it.
 
 ## What you get after install
 
 | Surface | Name | Use it when… |
 |---|---|---|
-| **Sub-agent** | `video-production-agent` | Parent agent wants a hands-off "make me the video" delegation with a clean JSON return |
-| **MCP tool (high-level)** | `mcp__noirsboxes-video-producer__produce_noirsboxes_short(sku, ...)` | One-shot full-pipeline call. 15–20 min, ~$2. |
-| **MCP tools (low-level)** | `runway_image_to_video`, `runway_text_to_video_gen45`, `elevenlabs_tts`, `elevenlabs_music`, `remotion_render`, `measure_audio_duration` | Custom orchestration, retake a single clip, mix languages |
-| **Skill** | `noirsboxes-shorts` | Reference knowledge for the whole pipeline; auto-loads when the parent mentions NoirsBoxes |
+| **Pipelines** | `animated-explainer`, `talking-head`, `screen-demo`, `clip-factory`, `podcast-repurpose`, `cinematic`, `animation`, `hybrid`, `avatar-spokesperson`, `localization-dub`, `documentary-montage`, `social-short-15s` | The host agent picks one per the request shape — see [AGENT_GUIDE.md](AGENT_GUIDE.md) Rule Zero |
+| **Local-GPU image** | `comfyui_image` | Local FLUX-schnell GGUF / SDXL-Lightning via ComfyUI server |
+| **Local-GPU video** | `comfyui_video` | Local Stable Video Diffusion (image-to-video) via ComfyUI |
+| **Local-GPU video (diffusers)** | `wan_video`, `ltx_video_local`, `hunyuan_video`, `cogvideo_video` | Direct diffusers pipelines (alternative to ComfyUI) |
+| **Cloud image gen** | `flux_image`, `recraft_image`, `google_imagen`, `openai_image`, `grok_image` | Premium quality / no local GPU |
+| **Cloud video gen** | `runway_video`, `kling_video`, `seedance_video`, `minimax_video`, `veo_video`, `higgsfield_video`, `heygen_video` | Top-tier motion, lip-sync, hero shots |
+| **MCP cloud wrappers** | `runway_image_to_video`, `runway_text_to_video_gen45`, `elevenlabs_tts`, `elevenlabs_music`, `remotion_render`, `measure_audio_duration` | Direct cloud calls from host agent (no registry routing) |
+| **Selectors** | `image_selector`, `video_selector`, `tts_selector` | Auto-route by preference + availability |
+
+The host agent reads [AGENT_GUIDE.md](AGENT_GUIDE.md) Rule Zero, picks
+the right pipeline, runs preflight, and only then executes. Pipelines
+declare which tools they need; selectors handle multi-provider routing.
+
+## Hardware target
+
+- **CPU-only / API-only path**: any modern machine + API keys for FAL /
+  Runway / ElevenLabs
+- **Local-GPU path**: NVIDIA GPU recommended (RTX 4060 8GB+) — runs
+  ComfyUI server locally, zero API cost
+- **Hybrid**: install both. Selectors auto-route to local where
+  available, fall back to cloud where not
 
 ## Install (one-time)
 
 ```bash
-# 1. Clone or download this repo to any location on your machine.
-git clone https://github.com/<user>/video-producer.git
+git clone <this-repo>
 cd video-producer
-
-# 2. One-shot dependency installer (Python + Node + .env scaffold).
-bash install.sh
-
-# 3. Fill in .env with your real API keys:
-#      RUNWAY_API_KEY      (required)
-#      ELEVENLABS_API_KEY  (required)
-#      FAL_KEY             (optional — only needed if you want FAL-backed tools)
-
-# 4. Drop product photos (if you haven't already) under:
-#    assets/brand/norisboxes/product-image/MD-XXX/
-#      MD-XXX-blank-holding.jpg              # hand holding, blank screen
-#      MD-XXX-cable-inferior-89scores.jpg    # hand holding, "Inferior 89" screen
-#      MD-XXX-cable-original-100scores.jpg   # hand holding, "Original 100" screen
-#      MD-XXX-blank.jpg                      # studio shot (used in outro)
+bash install.sh        # Python + Node + .env scaffold
 ```
 
-## Register with Claude Code (local install)
+### Optional — bring up ComfyUI for the local-GPU path
 
-Claude Code does **not** have a `/plugin add <path>` command. Local installs
-go through a self-hosted **marketplace** — the plugin directory declares
-itself as a marketplace, you register it once, then install the plugin from
-that marketplace. After install the plugin is available globally (user
-scope) so every Claude Code session in every project sees it.
+Full instructions including the model download list live in
+[tools/comfyui_workflows/README.md](tools/comfyui_workflows/README.md).
+Quick version:
 
-### Step 1 — validate the manifest (optional, recommended)
+```bash
+git clone https://github.com/comfyanonymous/ComfyUI
+cd ComfyUI && pip install -r requirements.txt
+
+# custom nodes for FLUX-GGUF + SVD (only needed for those workflows)
+cd custom_nodes
+git clone https://github.com/ltdrdata/ComfyUI-Manager
+git clone https://github.com/city96/ComfyUI-GGUF
+git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite
+cd ..
+
+# start the server (the bridge connects here)
+python main.py --listen 127.0.0.1 --port 8188
+```
+
+Drop model weights per the workflow README's table, then verify:
+
+```bash
+curl -fsS http://127.0.0.1:8188/system_stats   # should return JSON
+```
+
+Override host/port via `COMFYUI_HOST` / `COMFYUI_PORT` env vars.
+
+### Optional — fill .env for cloud providers
+
+The plugin runs purely local with no .env. Add keys only for the cloud
+providers you actually want to use:
+
+```bash
+FAL_KEY=                 # FLUX / Kling / Veo via fal.ai
+RUNWAY_API_KEY=          # Runway Gen-4 / gen4.5
+ELEVENLABS_API_KEY=      # TTS + music generation
+GOOGLE_API_KEY=          # Imagen / VEO direct
+OPENAI_API_KEY=          # DALL-E / OpenAI TTS
+# … see .env.example for the full list
+```
+
+Preflight (`provider_menu_summary()`) reports which providers are
+configured, and the selectors silently skip the unconfigured ones.
+
+## Register with Claude Code (local marketplace install)
+
+Claude Code does **not** have `/plugin add <path>`. Local installs go
+through a self-hosted **marketplace** — the plugin folder declares
+itself as a marketplace, you register it once, then install the plugin
+from that marketplace. Once installed it's available globally in every
+Claude Code session.
+
+### Step 1 — validate (optional, recommended)
 
 ```bash
 claude plugin validate /absolute/path/to/video-producer
 ```
 
-Expect `✔ Validation passed` for both the plugin manifest and the
-marketplace manifest.
+Expect `✔ Validation passed`.
 
 ### Step 2 — register the self-marketplace
 
@@ -60,215 +107,181 @@ marketplace manifest.
 claude plugin marketplace add /absolute/path/to/video-producer
 ```
 
-This reads `.claude-plugin/marketplace.json` from the folder and registers
-the marketplace **under the name declared inside that file** (currently
-`video-producer`). Claude Code adds it to user settings; no re-run needed
-per project.
-
 Verify:
+
 ```bash
 claude plugin marketplace list
 # → video-producer   /abs/path/to/video-producer   (local)
 ```
 
-### Step 3 — install the plugin from the marketplace
+### Step 3 — install the plugin
 
 ```bash
-claude plugin install noirsboxes-video-producer@video-producer
-```
-
-The `@video-producer` suffix names the marketplace added in Step 2.
-Output:
-```
-Installing plugin "noirsboxes-video-producer@video-producer"...
-✔ Successfully installed plugin: noirsboxes-video-producer@video-producer (scope: user)
+claude plugin install video-producer@video-producer
 ```
 
 Verify:
+
 ```bash
 claude plugin list
-# → noirsboxes-video-producer@video-producer    Version: 0.1.0    Scope: user    Status: ✔ enabled
+# → video-producer@video-producer    Version: 0.2.0    Scope: user    Status: ✔ enabled
 ```
 
-### What just got registered
+### What gets registered
 
-Claude Code reads `.claude-plugin/plugin.json` and auto-loads:
-- the **skill** (`.agents/skills/noirsboxes-shorts`) — visible via `/noirsboxes-shorts`
-- the **sub-agent** (`agents/video-production-agent.md`) — invokable via the `Task` tool as `subagent_type="video-production-agent"`
-- the **MCP server** (`mcp/server.py`) — its 7 tools appear with the `mcp__noirsboxes-video-producer__` prefix
+Claude Code reads `.claude-plugin/plugin.json` and auto-loads the **MCP
+server** (`mcp/server.py`); its low-level tools appear with the
+`mcp__video-producer__` prefix.
+
+The 13 pipelines + their stage director skills + the tool registry are
+all picked up on demand by Rule Zero — no separate registration.
 
 ### Plugin lifecycle commands
 
-| Command | What it does |
+| Command | Action |
 |---|---|
-| `claude plugin list` | Show all installed plugins, versions, scope, enabled state |
-| `claude plugin disable noirsboxes-video-producer` | Temporarily disable without uninstalling (keeps settings) |
-| `claude plugin enable noirsboxes-video-producer` | Re-enable a disabled plugin |
-| `claude plugin uninstall noirsboxes-video-producer@video-producer` | Uninstall (leaves the files on disk) |
-| `claude plugin update noirsboxes-video-producer` | Pull newest version from the marketplace — run after editing files in the plugin folder |
-| `claude plugin marketplace list` | See all registered marketplaces |
-| `claude plugin marketplace update video-producer` | Refresh the local marketplace after editing `marketplace.json` |
-| `claude plugin marketplace remove video-producer` | Remove the whole marketplace (uninstalls every plugin from it) |
+| `claude plugin list` | List installed plugins, versions, status |
+| `claude plugin disable video-producer` | Disable without uninstalling |
+| `claude plugin enable video-producer` | Re-enable |
+| `claude plugin uninstall video-producer@video-producer` | Uninstall (leaves source on disk) |
+| `claude plugin update video-producer` | Pull latest from marketplace |
+| `claude plugin marketplace update video-producer` | Refresh marketplace after local edits |
+| `claude plugin marketplace remove video-producer` | Remove the whole marketplace |
 
 ### Session-only install (no persistence)
-
-If you want to try the plugin in a single session without registering it
-globally, launch Claude Code with `--plugin-dir`:
 
 ```bash
 claude --plugin-dir /absolute/path/to/video-producer
 ```
 
-The plugin is loaded for that session only and disappears when you exit.
-Useful for testing a plugin you haven't committed yet.
+Useful for testing uncommitted changes.
 
-## Invocation patterns
+## How a host agent invokes the plugin
 
-### Pattern 1 — hands-off sub-agent
+### Pattern 1 — pipeline-driven (the standard path)
+
+The host agent reads [AGENT_GUIDE.md](AGENT_GUIDE.md), classifies the
+request, picks a pipeline from `pipeline_defs/`, reads its stage
+director skills, runs preflight, and executes:
 
 ```
-You: please produce a NoirsBoxes MD-907 showcase short for our new SKU launch
+User: "Make me a 60-second explainer about how solar panels work"
 
-Main agent (thinking) → this is a NoirsBoxes video request; delegate to
-                        video-production-agent via Task tool
-
-Task(subagent_type="video-production-agent",
-     prompt="Produce a 30s 9:16 English showcase for MD-907.
-             Tagline: 'The charger that sees through fakes.'
-             Features: ['USB-C PD read', 'QC 2.0 detection', 'Offline scoring',
-                        'C48 to C94 chips'].
-             Output to ./renders/md907-launch.mp4")
-
-video-production-agent (12-18 min later) →
-    {"mp4_path": "./renders/md907-launch.mp4",
-     "duration_s": 26.5,
-     "resolution": "1080x1920",
-     "cost_usd_estimated": 2.05,
-     "scenes_rendered": 9,
-     "notes": "all scenes rendered cleanly"}
-
-Main agent → "done: ./renders/md907-launch.mp4 (26.5s, $2.05)"
+Host agent → Rule Zero → animated-explainer pipeline
+          → reads pipeline_defs/animated-explainer.yaml
+          → research → proposal → script → scene_plan → assets → edit → compose → publish
+          → returns projects/solar-panels-explainer/renders/final.mp4
 ```
 
-### Pattern 2 — direct MCP tool call
+Different request shapes route to different pipelines automatically —
+see the pipeline table in [AGENT_GUIDE.md](AGENT_GUIDE.md). The host
+agent never invents its own production order.
 
-When the main agent wants more control:
+### Pattern 2 — direct tool calls (one-shot generation)
+
+For ad-hoc image / clip generation without going through a pipeline:
 
 ```python
-mcp__noirsboxes-video-producer__produce_noirsboxes_short(
-    sku="MD-907",
-    tagline="The charger that sees through fakes.",
-    features=["USB-C PD read", "QC 2.0 detection",
-              "Offline scoring", "C48 to C94 chips"],
-    language="en",
-    output_dir="./renders/",
-)
+from tools.tool_registry import registry
+registry.discover()
+
+# Local-GPU keyframe via FLUX-schnell GGUF
+registry.get("comfyui_image").execute({
+    "prompt": "a cinematic close-up of a Taipei street vendor at night",
+    "workflow": "flux_schnell_gguf",
+    "width": 1024, "height": 1024,
+    "output_path": "out.png",
+})
+
+# Cloud equivalent via FLUX on fal.ai
+registry.get("flux_image").execute({
+    "prompt": "a cinematic close-up of a Taipei street vendor at night",
+    "width": 1024, "height": 1024,
+    "output_path": "out.png",
+})
+
+# Let the selector pick whichever is configured + available
+registry.get("image_selector").execute({
+    "prompt": "...",
+    "output_path": "out.png",
+})
 ```
 
-### Pattern 3 — custom orchestration (e.g. only retake scene 2)
+### Pattern 3 — MCP cloud wrappers for hero shots
+
+When the host agent wants a single high-quality cloud generation
+without going through the registry:
 
 ```python
-# Regenerate just the "phone dying" T2V clip with a tighter prompt
-mcp__noirsboxes-video-producer__runway_text_to_video_gen45(
-    prompt="Extreme close-up of a smartphone screen with pulsing red low-battery "
-           "icon on a midnight-blue desk, shallow DOF, cinematic. Vertical 9:16.",
-    output_path="./assets/video/tv_phone_dying.mp4",
-    duration=5, ratio="9:16",
-)
-
-# Then re-render Remotion without re-running the whole pipeline
-mcp__noirsboxes-video-producer__remotion_render(
-    composition_id="MD905Shorts",
-    output_path="./renders/md905-shorts-v4.mp4",
+mcp__video-producer__runway_image_to_video(
+    image_path="./hero.png",
+    prompt="slow push-in, golden-hour, shallow depth of field",
+    output_path="./hero-clip.mp4",
+    duration=5,
+    ratio="9:16",
 )
 ```
 
-### Pattern 4 — language variant (German)
+Requires `RUNWAY_API_KEY` in `.env`.
 
-```python
-# Translate narration lines externally, then call low-level TTS with German voice
-for name, text in [("vo_01_hook", "Dieses Kabel sah echt aus."), ...]:
-    mcp__noirsboxes-video-producer__elevenlabs_tts(
-        text=text,
-        output_path=f"./assets/audio-de/{name}.mp3",
-        voice_id="pqHfZKP75CvOlQylNhV4",  # Bill (German)
-    )
+## Picking a pipeline (cheat sheet)
 
-# Re-render with overridden voiceover paths
-mcp__noirsboxes-video-producer__remotion_render(
-    composition_id="MD905Shorts",
-    output_path="./renders/md905-shorts-de.mp4",
-    props={"vo1": "./assets/audio-de/vo_01_hook.mp3", ...},
-)
-```
+| Customer request shape | Pipeline | Why |
+|---|---|---|
+| "Make a video about X" (topic-driven) | `animated-explainer` | Research → script → AI assets → render |
+| "Edit this 30-min talk into highlights" | `clip-factory` | Long source → many short outputs |
+| "Cut this footage into a teaser" | `cinematic` | Mood-led edit on existing footage |
+| "Make a screen recording demo for our app" | `screen-demo` | Capture or synthetic screen recording |
+| "Animate this concept" / motion-graphics-heavy | `animation` | Remotion/HyperFrames-first assets |
+| "Talking head video from this raw footage" | `talking-head` | Cuts + captions + auto-reframe |
+| "Avatar presenter version" | `avatar-spokesperson` | HeyGen / lip-sync routes |
+| "Translate this video into Japanese" | `localization-dub` | Subtitle + dub pipeline |
+| "Repurpose this podcast" | `podcast-repurpose` | Audio-led → visual derivatives |
+| "Mix footage with B-roll generation" | `hybrid` | Real footage + generated visuals |
+| "Documentary cut from this 2-hour interview" | `documentary-montage` | Theme-driven montage |
+| "Quick 15s Reel / TikTok for our brand" | `social-short-15s` | Lean 5-stage path, local-GPU friendly |
 
-## What counts as a "new SKU"?
-
-Minimum needed to produce a video for MD-907, MD-910, etc.:
-
-1. Three brand photos under `assets/brand/norisboxes/product-image/MD-XXX/`
-   matching the MD-905 filename pattern.
-2. That's it. If the SKU uses the same scoring system (inferior N / original 100)
-   the default script works as-is with only the SKU number changed.
-
-If the SKU has a different scoring display (e.g. voltage tester with
-safe/unsafe instead of 0-100):
-- Edit the `SCENE_SECONDS` in `remotion-composer/src/MD905Shorts.tsx`
-- Replace the scene 4/6 captions with `Unsafe. 9.1V.` / `Safe. 5.2V.`
-- Rerun — the MCP high-level tool also needs a schema patch
+If the host agent can't classify, AGENT_GUIDE.md says to ask the user
+rather than guess.
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `claude plugin validate` reports unrecognized keys | `plugin.json` has non-spec fields (`$schema`, `requirements`, `install`) | Remove those keys — only `name`, `version`, `description`, `author`, `license`, `keywords`, `skills`, `agents`, `mcpServers` are recognized |
-| `claude plugin marketplace add <path>` errors "manifest not found" | Folder has no `.claude-plugin/marketplace.json` | Add the marketplace file (see `.claude-plugin/marketplace.json` for the schema) |
-| `claude plugin install <name>@<marketplace>` says "plugin not found" | The `<name>` in the install command must match `plugins[].name` in marketplace.json, and `<marketplace>` must match the marketplace's top-level `name` | Check both files: `cat .claude-plugin/plugin.json .claude-plugin/marketplace.json \| grep '"name"'` |
-| `/plugin add <path>` is rejected as unknown command | No such command exists in Claude Code | Use the `marketplace add` → `plugin install` flow described above |
-| Plugin size exceeds 100 MB | Folder contains `node_modules/`, `projects/`, `.git/`, or similar bulk | Add them to `.claudeignore` (already done in this repo — see `.claudeignore`) |
-| MCP server fails to start | Python version / missing deps | Re-run `bash install.sh`; verify `python >=3.11` and `pip install mcp` |
-| `produce_noirsboxes_short` returns `blocker: Brand folder not found` | Missing SKU photos | Drop the three required photos per "What counts as a new SKU?" above |
-| Runway T2V returns 400/403 on all models | Account plan doesn't include gen4.5 | Ask Runway support to enable gen4.5 or seedance2 on the API key |
-| ElevenLabs returns 429 on multiple TTS calls | Burst rate-limit | The high-level tool already retries sequentially; if still failing, reduce `max_workers` in `server.py` |
+| `comfyui_image` reports `status=unavailable` | ComfyUI server not running, or `COMFYUI_HOST/PORT` mismatch | `curl http://127.0.0.1:8188/system_stats`; check env vars |
+| `prompt outputs failed validation` (ComfyUI) | Workflow references a custom node not installed | Read the workflow's `_meta.required_custom_nodes`; install via ComfyUI-Manager |
+| Cloud tool reports `status=unavailable` | API key not set | `cat .env`; add the relevant key per its `install_instructions` |
+| Agent picks the "wrong" pipeline | Request was ambiguous | AGENT_GUIDE.md instructs agent to ask the user when unclear; if it didn't, file an issue and tighten the brief |
+| `CUDA out of memory` on local video gen | Model too large for VRAM | For SVD: use `svd.safetensors` (14-frame), NOT `svd_xt`; lower resolution to 432×768 |
+| `claude plugin install` says "plugin not found" | Marketplace name vs plugin name mismatch | `cat .claude-plugin/{plugin,marketplace}.json \| grep name` |
+| MCP tools don't appear in a new session | Plugin disabled / MCP server crashed | `claude plugin list` (check status); `claude plugin update video-producer`; restart session |
 | Remotion render crashes with font errors | `remotion-composer/node_modules` corrupt | `cd remotion-composer && rm -rf node_modules && npm install` |
-| MCP tools don't appear in a new session | Plugin is `disabled`, MCP server crashed on boot, or cache stale | `claude plugin list` (check status) → `claude plugin update noirsboxes-video-producer` → restart the session |
 
 ## Uninstall
 
 ```bash
-claude plugin uninstall noirsboxes-video-producer@video-producer
-# or remove the marketplace entirely (uninstalls all plugins in it):
+claude plugin uninstall video-producer@video-producer
+# or remove the whole marketplace:
 claude plugin marketplace remove video-producer
 ```
 
-The plugin source code stays on disk — delete the folder manually if you want it gone.
-
-## Updating the plugin after local edits
-
-When you edit files inside this folder (e.g. tweak the subagent prompt, add
-a new MCP tool, update the skill), Claude Code **caches** the previous
-version. To pick up your changes:
+## Updating after local edits
 
 ```bash
-# 1. Refresh the marketplace's view of the plugin folder
 claude plugin marketplace update video-producer
-
-# 2. Pull the new plugin version into each install
-claude plugin update noirsboxes-video-producer
+claude plugin update video-producer
 ```
 
-Restart the Claude Code session (exit and re-open) so the MCP server
-re-launches with the new `mcp/server.py`.
+Restart the Claude Code session so the MCP server re-launches with the
+new code.
 
 ## Cost reference
 
-| Action | Typical cost |
+| Path | Per-video cost |
 |---|---|
-| One new 30s MD-xxx short (all 7 clips + TTS + music + render) | ~$2.00 |
-| One retake of a single Runway clip (I2V or T2V) | $0.25 |
-| One new language variant (TTS-only) | $0.05 |
-| One re-render of Remotion (no Runway/TTS changes) | $0.00 |
+| Local-GPU only (ComfyUI) | **$0.00** — just wall-time on your hardware |
+| Cloud premium (Runway + ElevenLabs + music gen) | $0.50-$3.00 depending on length + clip count |
+| Hybrid (local keyframes + cloud hero shots) | $0.10-$0.50 |
 
-Keep an eye on the `cost_usd_estimated` field in the high-level tool's return
-value. Anything over $4 on a single invocation means retries were out of
-control — investigate before batching more.
+Track actual costs via `tools/cost_tracker.py` — each pipeline records
+itemized spend in `projects/<id>/artifacts/cost_log.json`.

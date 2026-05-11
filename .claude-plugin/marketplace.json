@@ -6,9 +6,9 @@
   },
   "plugins": [
     {
-      "name": "noirsboxes-video-producer",
+      "name": "video-producer",
       "source": "./",
-      "description": "Produce NoirsBoxes MD-xxx showcase videos (30s 9:16 AI fast-cut shorts via Runway + ElevenLabs + Remotion)."
+      "description": "AI video producer plugin for social media bot to create engaging images or short videos for social media platforms like Instagram, TikTok, YouTube Shorts, etc. It uses AI to generate content based on user prompts or scripts and can create videos with dynamic transitions, effects, and music."
     }
   ]
 }
