@@ -1,13 +1,23 @@
 #!/usr/bin/env python
 """
-Social Short Producer — MCP server.
+video-producer — MCP server.
 
-Exposes low-level cloud media tools that complement the local-GPU
-ComfyUI bridge (`comfyui_image`, `comfyui_video`). The host agent can
-call these directly when it needs cloud capabilities (e.g. premium
-fal/Runway clip for a hero shot, ElevenLabs voice).
+Exposes the plugin's most-called tools to Claude Code as MCP tools so a
+host agent can drive image / video / audio generation without going
+through the Python registry directly.
 
-Tools published:
+Local-GPU tools (free, require a ComfyUI server running locally):
+
+    comfyui_check_status() -> {available, image_workflows, video_workflows}
+        Preflight: is ComfyUI reachable, what workflows are shipped.
+
+    comfyui_generate_image(prompt, output_path, workflow?, ...) -> {success, output}
+        Generate an image via a workflow template (sdxl_lightning by default).
+
+    comfyui_generate_video(reference_image_path, output_path, workflow?, ...) -> {success, output}
+        Animate a keyframe into a short clip (svd_image_to_video by default).
+
+Cloud tools (require API keys in $VIDEO_PRODUCER_PLUGIN_ROOT/.env):
 
     runway_image_to_video(image_path, prompt, model?, duration?, ratio?,
                           output_path) -> {video_path, cost_usd}
@@ -22,8 +32,8 @@ Tools published:
     measure_audio_duration(audio_path) -> {duration_s}
 
 The server is launched by Claude Code whenever the plugin is active. It
-reads credentials from the plugin's own .env (located at
-$VIDEO_PRODUCER_PLUGIN_ROOT/.env).
+reads credentials and ComfyUI host/port overrides from the plugin's
+own .env (located at $VIDEO_PRODUCER_PLUGIN_ROOT/.env).
 
 For the structured 15-second social-short workflow, the host agent
 should drive the `social-short-15s` pipeline (see
@@ -412,6 +422,258 @@ def remotion_render(
     except Exception:
         pass
     return info
+
+
+# ===========================================================================
+#  LOCAL-GPU TOOLS — ComfyUI bridge
+# ===========================================================================
+#
+# These wrap the registry's `comfyui_image` / `comfyui_video` BaseTool
+# instances. The host agent can call them from Claude Code without
+# touching the registry directly. Workflow selection, slot patching,
+# and HTTP transport all happen inside the BaseTool — the MCP wrapper
+# is just a typed entry point.
+#
+# Sentinel default values (0, -1, "", -1.0) mean "let the workflow
+# template's default take over". Only explicit overrides reach the
+# BaseTool, so the workflow JSON stays the single source of truth for
+# defaults.
+
+def _comfyui_host_endpoint() -> str:
+    return f"http://{os.environ.get('COMFYUI_HOST', '127.0.0.1')}:{os.environ.get('COMFYUI_PORT', '8188')}"
+
+
+@mcp.tool()
+def comfyui_check_status() -> dict[str, Any]:
+    """Check whether the local ComfyUI server is reachable and list available workflows.
+
+    Returns the connection status for the comfyui_image / comfyui_video
+    bridges plus the workflow templates currently shipped in
+    `tools/comfyui_workflows/`. Use this before calling
+    `comfyui_generate_image` or `comfyui_generate_video` to verify the
+    server is up.
+
+    Override the endpoint via COMFYUI_HOST / COMFYUI_PORT env vars
+    (defaults: 127.0.0.1 / 8188).
+
+    Returns:
+        {available, image_status, video_status, image_workflows[],
+         video_workflows[], endpoint, install_instructions?}
+    """
+    endpoint = _comfyui_host_endpoint()
+    if _tool_registry is None:
+        return {
+            "available": False,
+            "endpoint": endpoint,
+            "error": "tool registry failed to load — check video-producer install",
+        }
+    img = _tool_registry.get("comfyui_image")
+    vid = _tool_registry.get("comfyui_video")
+    if img is None or vid is None:
+        return {
+            "available": False,
+            "endpoint": endpoint,
+            "error": "comfyui_image / comfyui_video tools not registered — repo state issue",
+        }
+    img_status = img.get_status().value
+    vid_status = vid.get_status().value
+    out: dict[str, Any] = {
+        "available": img_status == "available" and vid_status == "available",
+        "endpoint": endpoint,
+        "image_status": img_status,
+        "video_status": vid_status,
+        "image_workflows": list(img.provider_matrix.keys()),
+        "video_workflows": list(vid.provider_matrix.keys()),
+    }
+    if img_status != "available":
+        out["install_instructions"] = img.install_instructions
+    return out
+
+
+@mcp.tool()
+def comfyui_generate_image(
+    prompt: str,
+    output_path: str,
+    workflow: str = "sdxl_lightning",
+    width: int = 0,
+    height: int = 0,
+    negative_prompt: str = "",
+    seed: int = -1,
+    steps: int = 0,
+    cfg: float = 0.0,
+    model_name: str = "",
+    timeout_s: float = 300.0,
+) -> dict[str, Any]:
+    """Generate an image via the local ComfyUI server.
+
+    Routes to the named workflow template under `tools/comfyui_workflows/`.
+    Default-shipped templates: `sdxl_lightning` (4-step SDXL Lightning,
+    8GB-VRAM friendly), `flux_schnell_gguf` (FLUX.1-schnell Q4_K_S GGUF,
+    best 8GB image quality, requires ComfyUI-GGUF custom node). Required
+    model weights per workflow are listed in `docs/LOCAL_GPU_SETUP.md`.
+
+    Args:
+        prompt: Generation prompt. FLUX wants natural-language sentences;
+                SDXL Lightning wants comma-separated tags.
+        output_path: Where to save the PNG (absolute, or relative to plugin root).
+        workflow: Template short-name. Default `sdxl_lightning`. Run
+                  `comfyui_check_status` to list what's available.
+        width: Image width in pixels. 0 = use workflow default.
+        height: Image height in pixels. 0 = use workflow default.
+        negative_prompt: Avoidance terms. Empty = use workflow default.
+                         Note: FLUX schnell ignores negative prompts.
+        seed: RNG seed. -1 = use workflow default (typically 0).
+        steps: Sampler steps. 0 = use workflow default (Lightning: 4, FLUX schnell: 4).
+        cfg: Guidance scale. 0.0 = use workflow default (Lightning: 1.5, FLUX schnell: 1.0).
+        model_name: Override checkpoint filename. Empty = use workflow default.
+        timeout_s: Max wait for the job to finish.
+
+    Returns:
+        {success: True, output, workflow, prompt_id, duration_s}
+        or {success: False, error}
+    """
+    if _tool_registry is None:
+        return {"success": False, "error": "tool registry failed to load"}
+    tool = _tool_registry.get("comfyui_image")
+    if tool is None:
+        return {"success": False, "error": "comfyui_image tool not registered"}
+
+    out = Path(output_path)
+    if not out.is_absolute():
+        out = PLUGIN_ROOT / out
+
+    inputs: dict[str, Any] = {
+        "prompt": prompt,
+        "workflow": workflow,
+        "output_path": str(out),
+        "timeout_s": timeout_s,
+    }
+    # Only pass non-sentinel values; let workflow template defaults apply otherwise.
+    if width > 0:
+        inputs["width"] = width
+    if height > 0:
+        inputs["height"] = height
+    if negative_prompt:
+        inputs["negative_prompt"] = negative_prompt
+    if seed >= 0:
+        inputs["seed"] = seed
+    if steps > 0:
+        inputs["steps"] = steps
+    if cfg > 0:
+        inputs["cfg"] = cfg
+    if model_name:
+        inputs["model_name"] = model_name
+
+    result = tool.execute(inputs)
+    if result.success:
+        return {
+            "success": True,
+            "output": result.data.get("output"),
+            "workflow": result.data.get("workflow"),
+            "prompt_id": result.data.get("prompt_id"),
+            "duration_s": result.duration_seconds,
+        }
+    return {"success": False, "error": result.error}
+
+
+@mcp.tool()
+def comfyui_generate_video(
+    reference_image_path: str,
+    output_path: str,
+    workflow: str = "svd_image_to_video",
+    video_frames: int = 0,
+    motion_bucket_id: int = 0,
+    fps: int = 0,
+    augmentation_level: float = -1.0,
+    seed: int = -1,
+    steps: int = 0,
+    cfg: float = 0.0,
+    width: int = 0,
+    height: int = 0,
+    timeout_s: float = 600.0,
+) -> dict[str, Any]:
+    """Animate a keyframe into a short clip via the local ComfyUI server.
+
+    Default workflow is `svd_image_to_video` — Stable Video Diffusion
+    14-frame i2v at 432×768 (9:16) or 768×432 (16:9), producing ~2s of
+    motion. Fits an RTX 4060 8GB. Requires the SVD checkpoint
+    (`svd.safetensors`, NOT svd_xt) and the ComfyUI-VideoHelperSuite
+    custom node. See `docs/LOCAL_GPU_SETUP.md` for the full setup list.
+
+    Args:
+        reference_image_path: Path to the keyframe (jpg/png). Absolute, or relative to plugin root.
+        output_path: Where to save the MP4. Absolute, or relative to plugin root.
+        workflow: Template short-name. Default `svd_image_to_video`.
+        video_frames: Frame count. 0 = workflow default (SVD: 14). Don't exceed 14 on svd.safetensors / 8GB VRAM.
+        motion_bucket_id: SVD motion intensity 1-255. 0 = workflow default (127).
+                          60-100 subtle (portraits, food), 110-140 balanced,
+                          150-200 dramatic, >200 produces warping.
+        fps: Output frame rate. 0 = workflow default (SVD: 7).
+        augmentation_level: 0.0-1.0 — how much SVD may deviate from input.
+                            -1.0 = workflow default (0.0). >0.3 = subject morph risk.
+        seed: RNG seed. -1 = workflow default.
+        steps: Sampler steps. 0 = workflow default (SVD: 20).
+        cfg: Guidance scale. 0.0 = workflow default (SVD: 2.5).
+        width: Frame width. 0 = workflow default.
+        height: Frame height. 0 = workflow default.
+        timeout_s: Max wait. SVD typically 60-120s on RTX 4060 8GB; default 600s.
+
+    Returns:
+        {success: True, output, workflow, prompt_id, duration_s}
+        or {success: False, error}
+    """
+    if _tool_registry is None:
+        return {"success": False, "error": "tool registry failed to load"}
+    tool = _tool_registry.get("comfyui_video")
+    if tool is None:
+        return {"success": False, "error": "comfyui_video tool not registered"}
+
+    ref = Path(reference_image_path)
+    if not ref.is_absolute():
+        ref = PLUGIN_ROOT / ref
+    if not ref.is_file():
+        return {"success": False, "error": f"reference image not found: {ref}"}
+
+    out = Path(output_path)
+    if not out.is_absolute():
+        out = PLUGIN_ROOT / out
+
+    inputs: dict[str, Any] = {
+        "operation": "image_to_video",
+        "reference_image_path": str(ref),
+        "workflow": workflow,
+        "output_path": str(out),
+        "timeout_s": timeout_s,
+    }
+    if video_frames > 0:
+        inputs["video_frames"] = video_frames
+    if motion_bucket_id > 0:
+        inputs["motion_bucket_id"] = motion_bucket_id
+    if fps > 0:
+        inputs["fps"] = fps
+    if augmentation_level >= 0:
+        inputs["augmentation_level"] = augmentation_level
+    if seed >= 0:
+        inputs["seed"] = seed
+    if steps > 0:
+        inputs["steps"] = steps
+    if cfg > 0:
+        inputs["cfg"] = cfg
+    if width > 0:
+        inputs["width"] = width
+    if height > 0:
+        inputs["height"] = height
+
+    result = tool.execute(inputs)
+    if result.success:
+        return {
+            "success": True,
+            "output": result.data.get("output"),
+            "workflow": result.data.get("workflow"),
+            "prompt_id": result.data.get("prompt_id"),
+            "duration_s": result.duration_seconds,
+        }
+    return {"success": False, "error": result.error}
 
 
 # ===========================================================================
