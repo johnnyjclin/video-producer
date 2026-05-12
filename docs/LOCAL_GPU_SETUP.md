@@ -466,6 +466,92 @@ ComfyUI server 沒開、port 不通、或 host 設錯 → plugin 的工具 `get_
 
 ---
 
+## Path A.5：本地 TTS（Piper）
+
+ComfyUI 走 GPU，但**配音不用 GPU**——Piper TTS 純 CPU 跑，安裝最簡單，現代筆電就能即時合成。視覺路徑搞定後，這是「下一個該裝」的東西。
+
+### 安裝（兩步）
+
+```bash
+# 1. 裝 Piper runtime
+pip install piper-tts
+
+# 2. 下載至少一個 voice model
+mkdir -p ~/.piper/models
+cd ~/.piper/models
+
+# 英文（推薦先試這個，品質最穩）
+piper --download-dir ~/.piper/models --model en_US-lessac-medium
+
+# 簡體中文女聲（若你做中文短影音；品質普通）
+piper --download-dir ~/.piper/models --model zh_CN-huayan-medium
+```
+
+模型清單：https://github.com/rhasspy/piper/blob/master/VOICES.md
+
+### 驗證安裝
+
+```bash
+# CLI 測試
+echo "Hello world" | piper --model en_US-lessac-medium --output_file /tmp/test.wav
+ls -lh /tmp/test.wav   # 應該幾秒內出來，幾百 KB
+
+# 從 video-producer 那邊驗
+python -c "
+from tools.tool_registry import registry
+registry.discover()
+print(registry.get('piper_tts').get_status().value)
+"
+# 期望：available
+```
+
+### 從 Claude Code 呼叫（MCP）
+
+兩個工具：
+
+```
+# Preflight：列出所有 TTS provider + 狀態
+call mcp__video-producer__tts_check_status
+# 預期客戶機沒設雲端 key：
+#   { "available": true,
+#     "providers": [
+#       {"tool_name": "piper_tts", "provider": "piper", "runtime": "local", "status": "available"},
+#       {"tool_name": "elevenlabs_tts", ..., "status": "unavailable", ...},
+#       ...
+#     ]}
+
+# 生成
+call mcp__video-producer__tts_generate with:
+  text: "Brew slower. Taste deeper."
+  output_path: "test/cta_voice.wav"
+  provider: "piper"
+  voice: "en_US-lessac-medium"
+```
+
+`provider="auto"` 時 selector 自動挑——客戶機沒設雲端 key，會挑到 piper。明確寫 `provider="piper"` 強制本地。
+
+### 誠實限制
+
+| 語言 | Piper 品質 | 建議 |
+|---|---|---|
+| 英文 | **好** — 多數場景 ElevenLabs 不會顯著贏 | 直接用 piper |
+| 簡體中文 | 普通 — 機器感明顯 | 短影音字卡為主、配音為輔的話可接受；要播報感建議 ElevenLabs |
+| 繁體中文 / 台灣國語 | 沒有原生 voice model | 用 `zh_CN-huayan-medium` 湊合，或走 ElevenLabs / Google TTS |
+| 日文 | 沒有官方 voice model | 雲端 |
+| 韓文 | 沒有官方 voice model | 雲端 |
+
+「文字疊加為主的短影音」其實**不需要配音**——on-screen text + 背景音樂就夠。配音通常是延伸需求。
+
+### 不裝 Piper 也能跑 social-short
+
+- 沒裝 → asset stage 偵測 TTS 不可用 → narration audio 跳過
+- compose stage 走「靜片 + 文字疊加 + 可選背景音樂」
+- 最終影片就是無人聲、字幕導向的版本（社群短影音常見格式）
+
+完整邏輯見 [skills/pipelines/social-short-15s/asset-director.md](../skills/pipelines/social-short-15s/asset-director.md) 的「Generate narration」段落。
+
+---
+
 ## Path B：diffusers 本地工具
 
 不想跑額外 server？這條走 HuggingFace diffusers 直接載模型進記憶體。每個工具呼叫時自己載入。

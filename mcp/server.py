@@ -6,7 +6,7 @@ Exposes the plugin's most-called tools to Claude Code as MCP tools so a
 host agent can drive image / video / audio generation without going
 through the Python registry directly.
 
-Local-GPU tools (free, require a ComfyUI server running locally):
+Local tools (free, no API keys):
 
     comfyui_check_status() -> {available, image_workflows, video_workflows}
         Preflight: is ComfyUI reachable, what workflows are shipped.
@@ -16,6 +16,13 @@ Local-GPU tools (free, require a ComfyUI server running locally):
 
     comfyui_generate_video(reference_image_path, output_path, workflow?, ...) -> {success, output}
         Animate a keyframe into a short clip (svd_image_to_video by default).
+
+    tts_check_status() -> {available, providers}
+        List which TTS providers are available + runtime class.
+
+    tts_generate(text, output_path, provider?, voice?, ...) -> {success, output}
+        Synthesise speech. Routes through tts_selector — picks Piper (LOCAL)
+        if no cloud TTS keys are set.
 
 Cloud tools (require API keys in $VIDEO_PRODUCER_PLUGIN_ROOT/.env):
 
@@ -671,6 +678,115 @@ def comfyui_generate_video(
             "output": result.data.get("output"),
             "workflow": result.data.get("workflow"),
             "prompt_id": result.data.get("prompt_id"),
+            "duration_s": result.duration_seconds,
+        }
+    return {"success": False, "error": result.error}
+
+
+# ===========================================================================
+#  TTS — local-first via the registry's tts_selector
+# ===========================================================================
+#
+# Routes through `tts_selector`, which auto-picks the highest-scoring
+# AVAILABLE TTS provider. With no cloud API keys set, Piper (LOCAL) wins
+# by default. Host agent can force a provider with `provider=`.
+
+@mcp.tool()
+def tts_check_status() -> dict[str, Any]:
+    """List which TTS providers are available + their runtime classes.
+
+    Returns the status of every tool with capability='tts' registered in
+    the plugin's registry. With no cloud API keys configured, only
+    `piper` (LOCAL, CPU-only) should show as available.
+
+    Returns:
+        {available, providers: [{name, provider, runtime, status, ...}]}
+    """
+    if _tool_registry is None:
+        return {"available": False, "error": "tool registry failed to load"}
+    tts_tools = _tool_registry.get_by_capability("tts")
+    providers = []
+    any_available = False
+    for tool in tts_tools:
+        if tool.name == "tts_selector":
+            continue
+        status = tool.get_status().value
+        if status == "available":
+            any_available = True
+        providers.append({
+            "tool_name": tool.name,
+            "provider": tool.provider,
+            "runtime": tool.runtime.value if hasattr(tool.runtime, "value") else str(tool.runtime),
+            "status": status,
+            "install_instructions": tool.install_instructions if status != "available" else None,
+        })
+    return {"available": any_available, "providers": providers}
+
+
+@mcp.tool()
+def tts_generate(
+    text: str,
+    output_path: str,
+    provider: str = "auto",
+    voice: str = "",
+    model_id: str = "",
+    output_format: str = "",
+    timeout_s: float = 120.0,
+) -> dict[str, Any]:
+    """Generate speech audio. Routes through tts_selector.
+
+    With `provider='auto'` (default), the selector picks the highest-
+    scoring AVAILABLE TTS provider. On a customer machine with no cloud
+    API keys, that's `piper` (LOCAL, CPU-only, ~real-time on a modern
+    laptop). With `ELEVENLABS_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY`
+    set, those typically outscore piper on output quality.
+
+    Args:
+        text: The text to synthesise. Keep under 500 chars for one call;
+              split longer scripts into multiple sentences for better pacing.
+        output_path: Where to save the audio (absolute or relative to plugin root).
+        provider: 'auto' (default) | 'piper' | 'elevenlabs' | 'openai' | 'google'.
+                  Force a specific provider; selector still respects availability.
+        voice: Provider-specific voice id. For piper this is the voice model
+               name (e.g. `en_US-lessac-medium`, `zh_CN-huayan-medium`). For
+               elevenlabs it's the voice UUID. Leave empty for provider default.
+        model_id: Optional TTS model (e.g. `eleven_multilingual_v2`).
+        output_format: Optional audio format hint (e.g. `mp3_44100_128`).
+                       Most providers default to mp3/wav as appropriate.
+        timeout_s: Max wait for the job to finish.
+
+    Returns:
+        {success, output, provider, model, duration_s} or {success: False, error}.
+    """
+    if _tool_registry is None:
+        return {"success": False, "error": "tool registry failed to load"}
+    selector = _tool_registry.get("tts_selector")
+    if selector is None:
+        return {"success": False, "error": "tts_selector not registered"}
+
+    out = Path(output_path)
+    if not out.is_absolute():
+        out = PLUGIN_ROOT / out
+
+    inputs: dict[str, Any] = {
+        "text": text,
+        "output_path": str(out),
+        "preferred_provider": provider,
+    }
+    if voice:
+        inputs["voice_id"] = voice
+    if model_id:
+        inputs["model_id"] = model_id
+    if output_format:
+        inputs["output_format"] = output_format
+
+    result = selector.execute(inputs)
+    if result.success:
+        return {
+            "success": True,
+            "output": result.data.get("output") or result.data.get("audio_path") or str(out),
+            "provider": result.data.get("selected_provider") or result.data.get("provider"),
+            "model": result.model or result.data.get("model"),
             "duration_s": result.duration_seconds,
         }
     return {"success": False, "error": result.error}
