@@ -94,22 +94,23 @@ Present a **short, friendly capability summary**. Do NOT dump the raw provider m
 
 ---
 
-**Welcome to OpenMontage!** I'm your video production agent. Here's what I can do with your current setup:
+**Welcome to video-producer!** I'm your video production agent. Here's what I can do with your current setup:
 
 **Ready to go:**
-- [List 2-4 key capabilities in plain language, e.g., "Generate narration with free offline TTS (Piper)", "Create animated videos with spring transitions, captions, and charts (Remotion)", "Stock footage and images from Pexels"]
+- [List 2-4 key capabilities in plain language, e.g., "Generate images locally on your GPU via ComfyUI (FLUX-schnell GGUF + SDXL Lightning)", "Animate keyframes with Stable Video Diffusion", "Generate narration with free offline TTS (Piper)", "Compose with Remotion + FFmpeg"]
 
 **Available pipelines:** [List the pipelines that work with their setup, with one-line descriptions]
 
-**Quick upgrades:** [If applicable — summarize the best 1-2 unlocks from `provider_menu()` based on the user's missing capabilities and actual install instructions. Do not hardcode `FAL_KEY` or any provider as the default suggestion.]
+**Brand assets:** [If `assets/brand/` exists AND has files — name what's there: "Detected logo + 3 product photos at assets/brand/. I'll use these as visual references." If empty or absent — skip this line entirely. Do NOT prompt the user to add brand assets.]
 
 ---
 
 **Rules for this presentation:**
 - Lead with what WORKS, not what's missing. The user should feel empowered, not inadequate.
-- Keep it to 8-12 lines max. Don't overwhelm.
-- Mention at most 2 quick-unlock suggestions. Don't nag about every missing key.
-- Read actual `install_instructions` from the registry — do not hardcode provider names or key names.
+- Keep it to 6-10 lines max. Don't overwhelm.
+- **Do NOT mention missing cloud API keys** unless the user explicitly asks about cloud quality. The local path is the customer-facing default — surfacing missing keys frames local as a downgrade, which it isn't. Per `AGENT_GUIDE.md` → "Local-First Auto-Fallback (DO NOT ASK)".
+- The **only** time to mention quick-unlock cloud upgrades is when the user asks "what could I unlock with API keys?" or when a specific local path is genuinely missing for their narrative (e.g. `dialogue` mode needs cloud TTS + lip-sync).
+- Read actual `install_instructions` from the registry only when the user explicitly asks — do not hardcode provider names or key names elsewhere.
 
 ### Step 4: Offer Starter Prompts
 

@@ -114,6 +114,37 @@ The agent must ask the user before changing any major production choice, includi
 
 Minor prompt refinements inside an already approved provider/model path do not require separate approval unless they materially change the creative direction.
 
+### Local-First Auto-Fallback (DO NOT ASK)
+
+**This is the customer-facing default.** When a cloud provider tool
+reports `status=UNAVAILABLE` because its API key isn't set in `.env`,
+that's NOT a "switch" requiring user approval — it's initial selection.
+The selector silently routes to the highest-scoring AVAILABLE provider,
+which on a customer machine without cloud keys is a local-GPU tool
+(comfyui_image / comfyui_video / wan_video / local_diffusion) or a
+local-CPU tool (piper_tts).
+
+Rules:
+
+- **Do not** prompt "Cloud is unavailable, may I use local instead?" —
+  this is the expected path, not a degradation.
+- **Do not** list missing API keys as if they were "quick unlocks" the
+  user must address — only mention them if the user explicitly asks for
+  cloud quality.
+- **Still announce** which local provider was picked before generating
+  (per "Announce Before Execution" above) — but as a statement, not a
+  question. Example: "Using `comfyui_image` with the `sdxl_lightning`
+  workflow (local GPU)."
+- **Do still ask** when the chosen narrative_mode or treatment is
+  genuinely impossible locally (e.g. `dialogue` mode, lip-sync,
+  multi-character continuity without IPAdapter) — that's a quality
+  blocker, not a routing decision. See the social-short-15s
+  idea-director's viability table.
+
+This rule overrides "Ask Before Major Changes" for the specific case of
+"cloud not configured" — but only that case. Mid-pipeline provider
+switches still require approval.
+
 ### Present Both Composition Runtimes (HARD RULE)
 
 When both Remotion and HyperFrames are available on the machine (check `video_compose.get_info()["render_engines"]`), the agent **MUST present both options to the user** before locking `render_runtime` at the proposal stage. The agent MAY recommend one with rationale — but silently picking a "default" is forbidden even when the pipeline manifest or a director skill suggests one.
@@ -218,6 +249,48 @@ music_library/
 ```
 
 If the folder has tracks, the proposal and asset stages should present them as options alongside generated music. See the proposal-director and asset-director skills for details.
+
+## Brand Reference Assets
+
+The customer drops visual references into `assets/brand/` (gitignored).
+Every visual stage director (`scene_plan`, `assets`) and the compose
+stage **MUST** check this folder before generating, because brand
+assets often dictate the look-and-feel the customer expects.
+
+Expected layout (none are required — agent uses whatever is present):
+
+```
+assets/brand/
+├── logo.png              # primary brand mark (PNG with transparency preferred)
+├── logo-light.png        # variant for dark backgrounds (optional)
+├── product/              # product hero shots
+│   ├── product-a-front.jpg
+│   ├── product-a-detail.jpg
+│   └── ...
+├── people/               # spokesperson / mascot reference shots
+│   └── founder-headshot.jpg
+└── style/                # mood-board / brand visual style refs
+    ├── color-palette.png
+    └── reference-mood-01.jpg
+```
+
+How the agent uses each subfolder:
+
+| Folder | Pipeline stage | Usage |
+|---|---|---|
+| `logo.png` / `logo-light.png` | `compose` | Overlay on hook or CTA frame via Remotion `<Img>` |
+| `product/` | `scene_plan`, `assets` | (a) Inform subject_prefix with concrete visual details. (b) If an IPAdapter workflow is available, feed as reference for shape/color consistency. Otherwise treat as descriptive ground truth — never silently substitute generated visuals for a real product photo when the customer wants the actual product. |
+| `people/` | `scene_plan`, `assets` | For `character_led` shorts: feed as IPAdapter face reference (requires `*_ipadapter` workflow). If no IPAdapter workflow installed, fall back to detailed verbal `subject_prefix` and surface the consistency risk per the social-short-15s idea-director. |
+| `style/` | `scene_plan` | Use as visual mood guidance when writing prompts (colors, lighting, framing). Reference filenames in `scene_plan.notes` so the source is traceable. |
+
+If `assets/brand/` is empty or missing: pipeline runs prompt-only. **No
+error, no prompt — just proceed.** Do not nag the customer to add
+brand assets unless they explicitly ask for brand-consistent output.
+
+If the customer explicitly wants brand-consistent output AND
+`assets/brand/` is empty: that's the only scenario where the agent
+asks "where should I find your logo / product photos?". Otherwise the
+folder's presence is opt-in metadata, not a precondition.
 
 ## Available Pipelines
 

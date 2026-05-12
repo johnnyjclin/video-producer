@@ -109,6 +109,22 @@ These two fields are linked. Pick `narrative_mode` first (using the
 viability table above), then write `subject_prefix` in the format that
 mode demands (see "Subject prefix rules per mode" above).
 
+**Check `assets/brand/` before writing the subject_prefix.** If the
+customer has dropped brand reference assets, the prefix should match
+what's actually in those photos — don't invent a product / mascot /
+person that contradicts the real reference:
+
+| Folder present | What to do |
+|---|---|
+| `assets/brand/product/*.jpg` | Use the actual product as `narrative_mode=object_led` subject. Write the `subject_prefix` from what you SEE in the photo (color, material, shape, packaging detail) — not a generic invention. |
+| `assets/brand/people/*.jpg` | If brief leans toward `character_led`, set the `subject_prefix` to match the reference (age, hair, clothing). Note in brief that the IPAdapter workflow will be needed at asset stage for actual face consistency. |
+| `assets/brand/style/*.jpg` or `assets/brand/style/*.png` | Lift the mood (lighting, color palette, framing) into the `tone` field and into shot descriptions. |
+| `assets/brand/logo.png` | Note its presence — it will be overlaid by compose stage on the hook or CTA frame. No subject_prefix change needed. |
+| `assets/brand/` empty / absent | Write the `subject_prefix` from the brief alone, prompt-only. **Don't ask the customer to add brand assets** — see `AGENT_GUIDE.md` → "Brand Reference Assets". |
+
+Record which brand files you consulted in `brief.brand_assets_used: [...]`
+so downstream stages know to re-use them.
+
 If the user pushes back on a downgrade ("but I wanted a person in it"),
 the conversation is:
 

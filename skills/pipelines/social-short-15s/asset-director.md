@@ -53,6 +53,45 @@ If any of these fail, **stop and surface the blocker** per AGENT_GUIDE.md
 providers — the user picked this pipeline specifically for local. Ask
 before substituting.
 
+### 1b. Brand asset preflight
+
+Check `brief.brand_assets_used` (set by idea-director) and verify the
+referenced files are still on disk under `assets/brand/`:
+
+```python
+from pathlib import Path
+brand_dir = PLUGIN_ROOT / "assets" / "brand"
+missing = []
+for ref_path in brief.brand_assets_used:
+    if not (brand_dir / ref_path).is_file():
+        missing.append(ref_path)
+if missing:
+    # File listed in brief but no longer on disk — surface, don't skip silently
+    raise BlockerError(f"brand_assets_used references missing files: {missing}")
+```
+
+Resolve usage per asset type:
+
+| Brand asset | Where it goes |
+|---|---|
+| `assets/brand/logo*.png` | Pass to **compose-director** as overlay artifact — do NOT feed into image generation (logo should never be re-rendered, it must be the actual file) |
+| `assets/brand/product/*.jpg` | (a) Quote details into per-shot `image_prompt` (color, material). (b) If `*_ipadapter` workflow is shipped AND scene_plan opted in, use as IPAdapter reference. Else: prompt-only with the brand details described. |
+| `assets/brand/people/*.jpg` | Only meaningful for `character_led` mode. Requires IPAdapter workflow (not yet shipped) — without it, the customer was already warned at idea stage that consistency hit-rate drops to ~50-70%. Use as prompt-only reference. |
+| `assets/brand/style/*.{jpg,png}` | Already lifted into prompts by scene-director — at this stage, just confirm scene_plan's prompts mention the style cues (e.g. "warm golden hour", "minimal flat illustration"). |
+
+Record the actual paths used into `asset_manifest.brand_assets_used`:
+
+```yaml
+brand_assets_used:
+  logo: assets/brand/logo.png
+  product_refs:
+    - assets/brand/product/widget-front.jpg
+  style_refs:
+    - assets/brand/style/mood-warm.jpg
+```
+
+Compose-director reads this to schedule logo overlays.
+
 ### 2. Generate keyframes (5 shots)
 
 For each shot in `scene_plan.shots`:

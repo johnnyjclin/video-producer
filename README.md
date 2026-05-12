@@ -189,7 +189,7 @@ video-producer/
 └── tests/                  # Contract tests + QA harness
 
 # Gitignored，使用者本地存放
-├── media/assets/brand/     # 品牌素材 (Logo、產品圖)
+├── assets/brand/           # 品牌素材 (Logo、產品圖、視覺參考)
 ├── projects/<id>/          # 每次生產的輸出
 └── music_library/          # 版權自由音樂 (可選)
 ```
